@@ -5,7 +5,10 @@
     include(thymio-ar/thymio-ar.pri)
     include(deployment.pri)
 
-    QT3D_MODELS += assets/worldcenter-vegetation.dae
+    QT3D_MODELS += \
+        assets/worldcenter-bare.dae \
+        assets/worldcenter-vegetation.dae \
+        assets/orangehouse.dae
     QGLTF_PARAMS = -g
     load(qgltf)
 

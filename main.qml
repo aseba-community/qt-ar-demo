@@ -26,6 +26,7 @@ ApplicationWindow {
 					contentItem: Item {
 						Image {
 							source: modelData.icon
+							x: parent.height * 0.1
 							height: parent.height * 0.8
 							width: parent.height * 0.8
 						}
@@ -49,16 +50,16 @@ ApplicationWindow {
 		}
 
 		captureMode: Camera.CaptureViewfinder
-		/*cameraState: Camera.LoadedState*/
+		cameraState: Camera.LoadedState
 		//deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
 	}
 
 	Vision {
 		id: vision
 		landmarks: Landmark {
-			id: landmark
-			fileName: ":/assets/marker.xml"
-			property string icon: "images/marker-312.png"
+			id: worldCenterLandmark
+			fileName: ":/assets/markers/worldcenter.xml"
+			property string icon: "assets/markers/worldcenter_tracker.png"
 		}
 	}
 
@@ -75,7 +76,7 @@ ApplicationWindow {
 
 	Component.onCompleted: {
 		camera.start();
-		vision.calibrationRunning = true;
+		//vision.calibrationRunning = true;
 	}
 
 	Component.onDestruction: {
@@ -84,10 +85,10 @@ ApplicationWindow {
 
 	Scene3d {
 		anchors.fill: parent
-		camera: landmark.pose
+		camera: worldCenterLandmark.pose
 		lens: vision.lens
 		WorldCenter {
-			id: cave
+			id: worldCenter
 			enabled: true
 		}
 	}
