@@ -39,6 +39,18 @@ ApplicationWindow {
 					}
 				}
 			}
+
+			Item {
+				 Layout.fillWidth: true
+			}
+
+			ToolButton {
+				contentItem: Image {
+					anchors.centerIn: parent
+					source: "icons/ic_filter_center_focus_black_24px.svg"
+				}
+				onClicked: vision.calibrationRunning = true;
+			}
 		}
 	}
 
@@ -56,11 +68,18 @@ ApplicationWindow {
 
 	Vision {
 		id: vision
-		landmarks: Landmark {
-			id: worldCenterLandmark
-			fileName: ":/assets/markers/worldcenter.xml"
-			property string icon: "assets/markers/worldcenter_tracker.png"
-		}
+		landmarks: [
+			Landmark {
+				id: worldCenterLandmark
+				fileName: ":/assets/markers/worldcenter.xml"
+				property string icon: "assets/markers/worldcenter_tracker.png"
+			},
+			Landmark {
+				id: orangeHouseLandmark
+				fileName: ":/assets/markers/orangehouse.xml"
+				property string icon: "assets/markers/orangehouse_tracker.png"
+			}
+		]
 	}
 
 	property rect cameraRect
@@ -76,7 +95,6 @@ ApplicationWindow {
 
 	Component.onCompleted: {
 		camera.start();
-		//vision.calibrationRunning = true;
 	}
 
 	Component.onDestruction: {
@@ -91,6 +109,10 @@ ApplicationWindow {
 			id: worldCenter
 			enabled: true
 		}
+		/*OrangeHouse {
+			id: orangeHouse
+			enabled: true
+		}*/
 	}
 
 	// calibration rectangle

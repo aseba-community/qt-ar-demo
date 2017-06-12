@@ -8,5 +8,6 @@
         <file>OrangeHouse.qml</file>
         <file>assets/markers/orangehouse_tracker.png</file>
         <file>assets/markers/orangehouse.xml</file>
+        <file>icons/ic_filter_center_focus_black_24px.svg</file>
     </qresource>
 </RCC>
