@@ -16,11 +16,11 @@ Entity {
 
         components: [
             SceneLoader {
-                source: "/models/orangehouse.qgltf"
+                source: "/models/bluehouse.qgltf"
             },
             Transform {
-                rotation: fromAxisAndAngle(Qt.vector3d(0,0,1), 180) // buggy 3d model?
-                translation: Qt.vector3d(0, 0, -0.038)
+                //rotation: fromAxisAndAngle(Qt.vector3d(0,0,1), 180) // -> necessary?
+                //translation: Qt.vector3d(0, 0, -0.038)
         }
         ]
     }

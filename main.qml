@@ -1,4 +1,4 @@
-import QtQuick 2.6
+import QtQuick 2.7
 import QtQuick.Window 2.2
 import QtQuick.Dialogs 1.2
 import QtQuick.Layouts 1.0
@@ -6,8 +6,11 @@ import QtQuick.Controls 2.0
 import QtQuick.Controls.Material 2.0
 import QtMultimedia 5.5
 import Qt.labs.settings 1.0
+import Qt3D.Core 2.0
 import "qrc:/thymio-ar"
 //import "qrc:/thymio-vpl2" as VPL2
+
+import QtSensors 5.0
 
 ApplicationWindow {
 	id: window
@@ -51,10 +54,50 @@ ApplicationWindow {
 				}
 				onClicked: vision.calibrationRunning = true;
 			}
+
+            ToolButton {
+               contentItem: Image {
+                    anchors.centerIn: parent
+                    source: "icons/ic_reset_marker_black_24px.svg"
+               }
+               onClicked: {
+                    for(var i = 0; i < vision.landmarks.length; i++){
+                        vision.landmarks[i].seenOnce = false
+                    }
+               }
+            }
+            ToolButton {
+                contentItem: Image {
+                    id: buttonImage
+                    anchors.centerIn: parent
+                    source : "icons/ic_rotation_support_off_24px.svg"
+                }
+                onClicked: {
+                    console.log("pressed")
+                    vision.active = !vision.active
+                    buttonImage.source = rotationSensor.active ? "icons/ic_rotation_support_on_24px.svg" : "icons/ic_rotation_support_off_24px.svg"
+                }
+            }
 		}
 	}
 
-	Camera {
+    Transmem {
+        id: transmem
+        // marker
+        wCL: worldCenterLandmark
+        oHL: orangeHouseLandmark
+        aHL: adaHouseLandmark
+        // rotation sensor
+        rS: rotationSensor
+
+    }
+
+    RotationSensor {
+        id: rotationSensor
+        active: false
+    }
+
+    Camera {
 		id: camera
 
 		focus {
@@ -66,19 +109,35 @@ ApplicationWindow {
 		//deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
 	}
 
+    // HACK
+    Timer {
+        running: true
+        interval: 3000
+        onTriggered: {
+            camera.stop();
+            camera.start();
+        }
+    }
+
 	Vision {
 		id: vision
-		landmarks: [
+        active: true
+        landmarks: [
 			Landmark {
 				id: worldCenterLandmark
 				fileName: ":/assets/markers/worldcenter.xml"
 				property string icon: "assets/markers/worldcenter_tracker.png"
-			},
+            },
 			Landmark {
 				id: orangeHouseLandmark
 				fileName: ":/assets/markers/orangehouse.xml"
 				property string icon: "assets/markers/orangehouse_tracker.png"
-			}
+            },
+            Landmark {
+                id: adaHouseLandmark
+                fileName: ":/assets/markers/adahouse.xml"
+                property string icon: "assets/markers/adahouse_tracker.png"
+            }
 		]
 	}
 
@@ -103,17 +162,32 @@ ApplicationWindow {
 
 	Scene3d {
 		anchors.fill: parent
-		camera: worldCenterLandmark.pose
-		lens: vision.lens
-		WorldCenter {
+
+        camera: transmem.worldCenter2Camera
+
+        lens: vision.lens
+
+        Entity {
+           OrangeHouse {
+                id: orangeHouse
+                enabled: orangeHouseLandmark.seenOnce && vision.leastOneMarkerActive
+                t: transmem.center2OrangeHouse
+            }
+
+           AdaHouse {
+               id: adaHouse
+               enabled: adaHouseLandmark.seenOnce && vision.leastOneMarkerActive
+               t: transmem.center2AdaHouse
+           }
+        }
+
+        WorldCenter {
 			id: worldCenter
-			enabled: true
-		}
-		/*OrangeHouse {
-			id: orangeHouse
-			enabled: true
-		}*/
-	}
+            enabled: worldCenterLandmark.seenOnce && vision.leastOneMarkerActive
+        }
+    }
+
+
 
 	// calibration rectangle
 	Rectangle {
