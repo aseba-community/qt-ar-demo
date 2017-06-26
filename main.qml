@@ -66,35 +66,16 @@ ApplicationWindow {
                     }
                }
             }
-            ToolButton {
-                contentItem: Image {
-                    id: buttonImage
-                    anchors.centerIn: parent
-                    source : "icons/ic_rotation_support_off_24px.svg"
-                }
-                onClicked: {
-                    console.log("pressed")
-                    vision.active = !vision.active
-                    buttonImage.source = rotationSensor.active ? "icons/ic_rotation_support_on_24px.svg" : "icons/ic_rotation_support_off_24px.svg"
-                }
-            }
 		}
 	}
 
     Transmem {
         id: transmem
+
         // marker
         wCL: worldCenterLandmark
         oHL: orangeHouseLandmark
         aHL: adaHouseLandmark
-        // rotation sensor
-        rS: rotationSensor
-
-    }
-
-    RotationSensor {
-        id: rotationSensor
-        active: false
     }
 
     Camera {
@@ -106,8 +87,9 @@ ApplicationWindow {
 
 		captureMode: Camera.CaptureViewfinder
 		cameraState: Camera.LoadedState
-		//deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
+        deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
 	}
+
 
     // HACK
     Timer {
@@ -145,7 +127,7 @@ ApplicationWindow {
 	VideoOutput {
 		id: videoOutput
 		anchors.fill: parent
-		focus : visible
+        //focus : visible
 		source: camera
 		filters: [vision]
 		fillMode: VideoOutput.PreserveAspectCrop
@@ -170,20 +152,20 @@ ApplicationWindow {
         Entity {
            OrangeHouse {
                 id: orangeHouse
-                enabled: orangeHouseLandmark.seenOnce && vision.leastOneMarkerActive
+                enabled: orangeHouseLandmark.seenOnce
                 t: transmem.center2OrangeHouse
             }
 
            AdaHouse {
                id: adaHouse
-               enabled: adaHouseLandmark.seenOnce && vision.leastOneMarkerActive
+               enabled: adaHouseLandmark.seenOnce
                t: transmem.center2AdaHouse
            }
         }
 
         WorldCenter {
 			id: worldCenter
-            enabled: worldCenterLandmark.seenOnce && vision.leastOneMarkerActive
+            enabled: worldCenterLandmark.seenOnce
         }
     }
 
