@@ -15,7 +15,6 @@
         <file>assets/markers/bluehouse.xml</file>
         <file>assets/markers/bluehouse_tracker.png</file>
         <file>BlueHouse.qml</file>
-        <file>Transmem.qml</file>
         <file>icons/ic_reset_marker_black_24px.svg</file>
         <file>icons/ic_rotation_support_off_24px.svg</file>
         <file>icons/ic_rotation_support_on_24px.svg</file>

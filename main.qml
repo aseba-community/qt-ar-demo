@@ -10,6 +10,7 @@ import Qt3D.Core 2.0
 import "qrc:/thymio-ar"
 //import "qrc:/thymio-vpl2" as VPL2
 
+import MarkerModel 1.0
 import QtSensors 5.0
 
 ApplicationWindow {
@@ -69,15 +70,6 @@ ApplicationWindow {
 		}
 	}
 
-    Transmem {
-        id: transmem
-
-        // marker
-        wCL: worldCenterLandmark
-        oHL: orangeHouseLandmark
-        aHL: adaHouseLandmark
-    }
-
     Camera {
 		id: camera
 
@@ -87,7 +79,7 @@ ApplicationWindow {
 
 		captureMode: Camera.CaptureViewfinder
 		cameraState: Camera.LoadedState
-        deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
+        //deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
 	}
 
 
@@ -104,19 +96,25 @@ ApplicationWindow {
 	Vision {
 		id: vision
         active: true
+
+        property string cameraName : "cam"
+
         landmarks: [
 			Landmark {
 				id: worldCenterLandmark
+                name: "world"
 				fileName: ":/assets/markers/worldcenter.xml"
 				property string icon: "assets/markers/worldcenter_tracker.png"
             },
 			Landmark {
 				id: orangeHouseLandmark
-				fileName: ":/assets/markers/orangehouse.xml"
+                name: "orangeHouse"
+                fileName: ":/assets/markers/orangehouse.xml"
 				property string icon: "assets/markers/orangehouse_tracker.png"
             },
             Landmark {
                 id: adaHouseLandmark
+                name: "adaHouse"
                 fileName: ":/assets/markers/adahouse.xml"
                 property string icon: "assets/markers/adahouse_tracker.png"
             }
@@ -132,9 +130,16 @@ ApplicationWindow {
 		filters: [vision]
 		fillMode: VideoOutput.PreserveAspectCrop
 		onContentRectChanged: cameraRect = mapNormalizedRectToItem(Qt.rect(0, 0, 1, 1));
+
+
 	}
 
 	Component.onCompleted: {
+
+        // HACK
+        markermodel.updateLinkNow(orangeHouseLandmark.name, vision.cameraName, Qt.matrix4x4(), 1)
+        markermodel.updateLinkNow(adaHouseLandmark.name, vision.cameraName, Qt.matrix4x4(), 1)
+
 		camera.start();
 	}
 
@@ -142,30 +147,58 @@ ApplicationWindow {
 		camera.stop();
 	}
 
+    MarkerModel {
+        id: markermodel
+    }
+
+    Item {
+
+        Connections {
+            target: worldCenterLandmark
+            onChanged: {
+                markermodel.updateLinkNow(worldCenterLandmark.name, vision.cameraName, worldCenterLandmark.pose, 1.9)
+                markermodel.updateModel()
+            }
+        }
+
+        Connections {
+            target: orangeHouseLandmark
+            onChanged: {
+                markermodel.updateLinkNow(orangeHouseLandmark.name, vision.cameraName, orangeHouseLandmark.pose, orangeHouseLandmark.confidence)
+            }
+        }
+
+        Connections {
+            target: adaHouseLandmark
+            onChanged: {
+                markermodel.updateLinkNow(adaHouseLandmark.name, vision.cameraName, adaHouseLandmark.pose, adaHouseLandmark.confidence)
+            }
+        }
+    }
+
 	Scene3d {
 		anchors.fill: parent
 
-        camera: transmem.worldCenter2Camera
-
+        camera: markermodel.world2cam
         lens: vision.lens
 
         Entity {
            OrangeHouse {
                 id: orangeHouse
-                enabled: orangeHouseLandmark.seenOnce
-                t: transmem.center2OrangeHouse
+                enabled: orangeHouseLandmark.found
+                t: markermodel.world2orangeHouse
             }
 
            AdaHouse {
                id: adaHouse
-               enabled: adaHouseLandmark.seenOnce
-               t: transmem.center2AdaHouse
+               enabled: adaHouseLandmark.found
+               t: markermodel.world2adaHouse
            }
         }
 
         WorldCenter {
 			id: worldCenter
-            enabled: worldCenterLandmark.seenOnce
+            enabled: worldCenterLandmark.found
         }
     }
 

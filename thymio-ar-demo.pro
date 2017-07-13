@@ -6,7 +6,7 @@ SOURCES += \
     transmem/src/frameAndLink.cpp \
     transmem/src/stampedTransformation.cpp \
     transmem/src/transformationBuffer.cpp \
-    transmem/src/graphMLWriter.cpp \
+    transmem/src/graphMLWriter.cpp
 
 HEADERS += transmem/include/transmem/transmem.h
 INCLUDEPATH += transmem/include
