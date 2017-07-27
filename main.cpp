@@ -2,7 +2,8 @@
 #include <QQmlApplicationEngine>
 #include "thymio-ar/thymio-ar.h"
 
-#include "thymio-ar/markermodel.h"
+#include "markermodel.h"
+#include "experimentfilter.h"
 
 int main(int argc, char* argv[]) {
 
@@ -14,6 +15,7 @@ int main(int argc, char* argv[]) {
 	app.setApplicationName("Thymio AR demo");
 
     qmlRegisterType<MarkerModel>("MarkerModel", 1, 0, "MarkerModel");
+    qmlRegisterType<ExperimentFilter>("ExperimentFilter", 1, 0, "ExperimentFilter");
 
 	thymioARInit();
 

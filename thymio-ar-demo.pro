@@ -6,9 +6,13 @@ SOURCES += \
     transmem/src/frameAndLink.cpp \
     transmem/src/stampedTransformation.cpp \
     transmem/src/transformationBuffer.cpp \
-    transmem/src/graphMLWriter.cpp
+    transmem/src/graphMLWriter.cpp \
+    experimentfilter.cpp \
+    markermodel.cpp
 
-HEADERS += transmem/include/transmem/transmem.h
+HEADERS += transmem/include/transmem/transmem.h \
+    experimentfilter.h \
+    markermodel.h
 INCLUDEPATH += transmem/include
 
 RESOURCES += thymio-ar-demo.qrc
