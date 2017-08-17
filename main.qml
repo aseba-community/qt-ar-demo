@@ -166,6 +166,7 @@ ApplicationWindow {
         //deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
 	}
 
+
     // HACK
     Timer {
         running: true
@@ -176,11 +177,15 @@ ApplicationWindow {
         }
     }
 
+
     // Timer to update model.
     Timer {
         running: true
-        interval: 30
-        onTriggered: markermodel.updateModel()
+        interval: 20
+        onTriggered: {
+            markermodel.updateModel()
+            console.log(orangeHouseLandmark.visible)
+        }
         repeat: true
     }
 
@@ -188,24 +193,22 @@ ApplicationWindow {
 		id: vision
         active: true
 
-        property string cameraName : "cam"
-
         landmarks: [
 			Landmark {
 				id: worldCenterLandmark
-                name: "world"
+                identifier: "world"
 				fileName: ":/assets/markers/worldcenter.xml"
 				property string icon: "assets/markers/worldcenter_tracker.png"
             },
 			Landmark {
 				id: orangeHouseLandmark
-                name: "orangeHouse"
+                identifier: "orangeHouse"
                 fileName: ":/assets/markers/orangehouse.xml"
 				property string icon: "assets/markers/orangehouse_tracker.png"
             },
             Landmark {
                 id: adaHouseLandmark
-                name: "adaHouse"
+                identifier:  "adaHouse"
                 fileName: ":/assets/markers/adahouse.xml"
                 property string icon: "assets/markers/adahouse_tracker.png"
             }
@@ -231,64 +234,47 @@ ApplicationWindow {
 		camera.stop();
 	}
 
-    // For more information check markermodel.cpp
     MarkerModel {
         id: markermodel
+
+        worldCenterMarker: worldCenterLandmark
+        //worldCenterRelativeMarkers: [adaHouseLandmark]
+        //worldCenterRelativeMarkers: [orangeHouseLandmark]
+        worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
+
+        // model specific parameter
+
+
     }
 
-    // For more information check out experimentfilter.cpp
     ExperimentFilter {
         id: experimentFilter
         active: experimentFilterToggle.active
     }
 
-    Item {
-
-        Connections {
-            target: worldCenterLandmark
-            onChanged: {
-                markermodel.updateLinkNow(worldCenterLandmark.name, vision.cameraName, worldCenterLandmark.pose, worldCenterLandmark.confidence)
-            }
-        }
-
-        Connections {
-            target: orangeHouseLandmark
-            onChanged: {
-                markermodel.updateLinkNow(orangeHouseLandmark.name, vision.cameraName, orangeHouseLandmark.pose, orangeHouseLandmark.confidence)
-            }
-        }
-
-        Connections {
-            target: adaHouseLandmark
-            onChanged: {
-                markermodel.updateLinkNow(adaHouseLandmark.name, vision.cameraName, adaHouseLandmark.pose, adaHouseLandmark.confidence)
-            }
-        }        
-    }
-
 	Scene3d {
 		anchors.fill: parent
 
-        camera: markermodel.world2cam
+        camera: worldCenterLandmark.relativePose
         lens: vision.lens
 
         Entity {
            OrangeHouse {
                 id: orangeHouse
-                enabled: markermodel.world2orangeHouseActive
-                t: markermodel.world2orangeHouse
+                t: orangeHouseLandmark.relativePose
+                enabled: orangeHouseLandmark.visible
             }
 
            AdaHouse {
                id: adaHouse
-               enabled: markermodel.world2adaHouseActive
-               t: markermodel.world2adaHouse
+               t: adaHouseLandmark.relativePose
+               enabled: adaHouseLandmark.visible
            }
         }
 
         WorldCenter {
 			id: worldCenter
-            enabled: markermodel.world2camActive
+            enabled: worldCenterLandmark.visible
         }
     }
 

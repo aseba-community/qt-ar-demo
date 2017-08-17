@@ -1,13 +1,5 @@
 #include "markermodel.h"
 
-/********************
- * HELPER FUNCTIONS *
- ********************/
-
-/* REMARK:
- * Is it bad practice to define functions used by multiple classes and which not belong
- * to the class in a strong sense to one class outside without any class. */
-
 QMatrix4x4 qPair2Matrix(const qPair &qp){
 
     QMatrix4x4 ret(qp.first.toRotationMatrix());
@@ -105,14 +97,12 @@ bool equalTransformation(const qPair &qp1, const qPair &qp2){
            diff.z() < thTransformationEquality.z() && diff.w() < thTransformationEquality.w();
 }
 
-/***************
- * MARKERMODEL *
- ***************/
-
 // Constructor
 
 MarkerModel::MarkerModel(){
 
+   // Monitoring functionality
+   {
     // Necessary to allow connections to marker model monitor
     qRegisterMetaType<Timestamp>(); qRegisterMetaType<qPair>(); qRegisterMetaType<std::string>();
 
@@ -129,76 +119,74 @@ MarkerModel::MarkerModel(){
     connect(this, &MarkerModel::registerLinkUpdateToMonitor, monitor, &MarkerModelMonitor::registerLinkUpdateToMonitor);
     connect(this, &MarkerModel::registerTransformationToMonitor, monitor, &MarkerModelMonitor::registerTransformationToMonitor);
 
+
     monitorThread.start();
+    }
 }
 
 // Main functions for the qml interface
 
-void MarkerModel::updateLinkNow(const QString &srcFrame, const QString &destFrame, const QMatrix4x4 &trans, float conf){
+void MarkerModel::markerPositionUpdated(){
 
     Timestamp tsNow = std::chrono::high_resolution_clock::now();
-    qPair qp = matrix2qPair(trans);
-    std::string srcF = srcFrame.toStdString(); std::string destF = destFrame.toStdString();
 
-    // Signal to monitor, let it now there is a new update.
-    emit linkUpdate(srcF, destF, tsNow, qp, conf);
+    QObject *sender = QObject::sender();
+    Landmark *senderLandmark = qobject_cast<Landmark*>(sender);
 
-    // Model specific implementation
+    QMatrix4x4 pose = senderLandmark->pose();
+    double confidence = senderLandmark->confidence();
+    std::string markerID = (senderLandmark->identifier).toStdString();
 
-    // If confidence is high enough, that is greater than a threshold,
-    // we update transmem with the link.
-    if(conf >= thConfidenceMarkerUpdate)
-        registerLink(srcF, destF, tsNow, qp.first, qp.second, conf);
+    if(confidence >= thConfidenceMarkerUpdate)
+        registerLink(markerID, camID, tsNow, pose, confidence);
     else
-        try { updateLinkConfidence(srcF, destF, conf); }
+        try { updateLinkConfidence(markerID, camID, confidence); }
         catch(NoSuchLinkFoundException e) { /* Quality can just be updated if there was already a successful update. */ }
+
+    emit linkUpdate(camID, markerID, tsNow, matrix2qPair(pose), confidence);
 }
 
 void MarkerModel::updateModel(){
 
-    Timestamp tsNow = std::chrono::high_resolution_clock::now();
-
     // Helper lambda's
 
     /* REMARK:
-     * It would also be possible to implement these functions as part of the StampedAndRatedTransformation
+     * It would also be possible to implement these functions as part of the StampedTransformationWithConfidence
      * object or as proteced function of the MarkerModel class. But since the implementation strongly depends
      * on implentation the model it's more consistent to implement it here. */
 
-
-    // SART == StampedAndRatedTransformation
+    // SART == StampedTransformationWithConfidence
     // For more information about this type check out transmem.h.
 
-
     // Multiplication of two SART objects.
-    auto SARTMultiplier = [](const StampedAndRatedTransformation &lhs, const StampedAndRatedTransformation &rhs){
-        StampedAndRatedTransformation ret;
+    auto SARTMultiplier = [](const StampedTransformationWithConfidence &lhs, const StampedTransformationWithConfidence &rhs){
+        StampedTransformationWithConfidence ret;
 
         ret.time = lhs.time;
 
-        ret.qRot = lhs.qRot * rhs.qRot;
-        ret.qTra = lhs.qRot * rhs.qTra * lhs.qRot.conjugated();
-        ret.qTra = ret.qTra + lhs.qTra;
+        ret.rotation = lhs.rotation * rhs.rotation;
+        ret.translation = lhs.rotation * rhs.translation * lhs.rotation.conjugated();
+        ret.translation = ret.translation + lhs.translation;
 
-        ret.avgLinkConfidence = std::max(lhs.avgLinkConfidence, rhs.avgLinkConfidence);
+        ret.averageLinkConfidence = std::max(lhs.averageLinkConfidence, rhs.averageLinkConfidence);
         ret.maxDistanceToEntry = std::max(lhs.maxDistanceToEntry, rhs.maxDistanceToEntry);
 
         return ret;
     };
 
     // Averaging two SART objects if the encode an "equal" transformation.
-    auto SARTAveragerIfEqual = [this](const StampedAndRatedTransformation &lhs, const StampedAndRatedTransformation &rhs){
+    auto SARTAveragerIfEqual = [this](StampedTransformationWithConfidence &lhs, StampedTransformationWithConfidence &rhs){
 
-        bool encodeEqualTransformation = equalTransformation(qPair{lhs.qRot, lhs.qTra}, qPair{rhs.qRot, rhs.qTra});
+        bool encodeEqualTransformation = equalTransformation(qPair{lhs.rotation, lhs.translation}, qPair{rhs.rotation, rhs.translation});
 
         if(!encodeEqualTransformation)
             return lhs;
 
-        StampedAndRatedTransformation ret;
+        StampedTransformationWithConfidence ret;
 
-        ret.qRot = avgAndNormalizeQuaternions(lhs.qRot, rhs.qRot);
-        ret.qTra = avgQuaternions(lhs.qTra, rhs.qTra);
-        ret.avgLinkConfidence = (lhs.avgLinkConfidence + rhs.avgLinkConfidence ) / 2;
+        ret.rotation = avgAndNormalizeQuaternions(lhs.rotation, rhs.rotation);
+        ret.translation = avgQuaternions(lhs.translation, rhs.translation);
+        ret.averageLinkConfidence = (lhs.averageLinkConfidence + rhs.averageLinkConfidence ) / 2;
         ret.maxDistanceToEntry = (lhs.maxDistanceToEntry + rhs.maxDistanceToEntry) / 2.;
         ret.time = lhs.time;
 
@@ -206,163 +194,141 @@ void MarkerModel::updateModel(){
     };
 
     // Invert the tranformation encoded in a SART object.
-    auto SARTInverter = [](StampedAndRatedTransformation &lhs){
+    auto SARTInverter = [](StampedTransformationWithConfidence &lhs){
 
-        lhs.qRot = lhs.qRot.inverted();
-        lhs.qTra = -(lhs.qRot*lhs.qTra*lhs.qRot.conjugated());
+        lhs.rotation = lhs.rotation.inverted();
+        lhs.translation = -(lhs.rotation*lhs.translation*lhs.rotation.conjugated());
 
         return lhs;
     };
 
-    // ***************************************/
-    // Start of model specific implementation.
+    // Actual implementation of the model:
 
-    /* For the current implementation of the model the following assumptions are made:
-     *
-     * > The position of the marker relative to eachother is fix.
-     * > The marker encoding the world center (world center marker) has to been seen once,
-     *   other markers are not recognized before.
-     * > If a marker is "hidden", its corresponding object is not displayed. This corresponds to
-     *   the human perception of the real world - a hidden object cannot be seen. */
+    // Make sure there is a world center marker
+    if(!worldCenterMarker){
+        qWarning() << "No world center marker available. Returning.";
+        return;
+    }
 
-    /* GENERAL REMARK:
-     * The three markers are hardcoded into the model at the moment. In a later stage it
-     * may make sense to allow a more dynamic implementation of the model with any number
-     * of tracker. */
+    Timestamp tsNow = std::chrono::high_resolution_clock::now();
 
-    // Transformation needed for the model
-    StampedAndRatedTransformation world2camNowWCM, orangeHouse2camNow, adaHouse2camNow,
-                                  world2orangeHouseFix, world2adaHouseFix,
-                                  world2adaHouseNow, world2orangeHouseNow;
+    const std::string worldID = (worldCenterMarker->identifier).toStdString();
 
-    /* REMARK:
-     * Handling control flow with exceptions. Is this bad practice? */
-
-    // Fetching the transformations needed for the calculation of the model.
-    try{ world2camNowWCM = getLink(worldID, camID, tsNow); }
+    StampedTransformationWithConfidence world2camNow;
+    try{ world2camNow = getLink(worldID, camID, tsNow); }
     catch(NoSuchLinkFoundException){
         // World center marker has to be seen once, so we return here.
         return;
     }
 
-    try{
-        orangeHouse2camNow = getLink(orangeHouseID, camID, tsNow); }
-    catch(NoSuchLinkFoundException){ /* no link registered yet */ }
+    worldCenterMarker->visible = !(world2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
+    emit worldCenterMarker->visibilityUpdated();
 
-    try{ adaHouse2camNow = getLink(adaHouseID, camID, tsNow); }
-    catch(NoSuchLinkFoundException){ /* no link registered yet */ }
+    unsigned int numberOfRelativeMarker = relativeMarkers.count();
 
-    try{ world2orangeHouseFix = getBestLink(worldID, orangeHouseID); }
-    catch(NoSuchLinkFoundException){ /* no link registered yet */ }
+    // If no additional marker are available, we can't do that much..
+    if(numberOfRelativeMarker < 1){
 
-    try{ world2adaHouseFix = getBestLink(worldID, adaHouseID); }
-    catch(NoSuchLinkFoundException){ /* no link registered yet */ }
+        worldCenterMarker->relativePose = qPair2Matrix(qPair{world2camNow.rotation, world2camNow.translation});
+        emit worldCenterMarker->relativePoseUpdated();
 
-    // Calculating the two alternative Transformation from world center marker to the camera.
-    StampedAndRatedTransformation world2camNowOHM = SARTMultiplier(orangeHouse2camNow, world2orangeHouseFix),
-                                  world2camNowAHM = SARTMultiplier(adaHouse2camNow, world2adaHouseFix);
-
-    /* If the confidence for a marker is to low, that is smaller than thConfidenceMarkerVisible.,
-     * we set the transformation to inactive so that the corresponding object is not displayed.
-     *
-     * If the confidence for a marker is greater than the threshold the marker is somehow visible.
-     * If the corresponding object for the marker will be displayed is decided in a later stage. */
-    world2camActiveP = !(world2camNowWCM.avgLinkConfidence < thConfidenceMarkerVisible);
-    world2orangeHouseActiveP = !(orangeHouse2camNow.avgLinkConfidence < thConfidenceMarkerVisible);
-    world2adaHouseActiveP = !(adaHouse2camNow.avgLinkConfidence < thConfidenceMarkerVisible);
-
-    /* We sort the transformation from world to camera base depending on maxDistanceToEntry from smallest to greatest.
-     * The smaller this value the better the link, since this link was updated most recently, and an update also means
-     * the confidence for this link was over the threshold tfConfidenceMarkerUpdate. */
-    std::list<StampedAndRatedTransformation> trnsWorld2camNow = {world2camNowWCM, world2camNowOHM, world2camNowAHM};
-    auto cmp = [](const StampedAndRatedTransformation &lhs, const StampedAndRatedTransformation &rhs){ return lhs.maxDistanceToEntry < rhs.maxDistanceToEntry; };
-    trnsWorld2camNow.sort(cmp);
-
-    StampedAndRatedTransformation world2camBest = trnsWorld2camNow.front(); trnsWorld2camNow.pop_front();
-    StampedAndRatedTransformation world2cam2Best = trnsWorld2camNow.front(); trnsWorld2camNow.pop_front();
-    StampedAndRatedTransformation world2cam3Best = trnsWorld2camNow.front();
-
-    /* If no transformation from world to camera is good enough, that is the smallest value of maxDistanceToEntry
-     * for all three transformation is larger than the threshold thDistanceToLastUpdate, we set the world center
-     * marker to inactive. */
-    if(world2camBest.maxDistanceToEntry > thDistanceToLastUpdate)
-        world2camActiveP = false; 
-    /* The second best transformation has a maxDistanceToEntry value which is
-     * also smaller than the threshold. If the to best transformation encode "equal"
-     * transformations we average them. */
-    else if(world2cam2Best.maxDistanceToEntry < thDistanceToLastUpdate &&
-            world2cam3Best.maxDistanceToEntry > thDistanceToLastUpdate)
-        world2camBest = SARTAveragerIfEqual(world2camBest, world2cam2Best);
-
-    // All three tranformations from world to cam are good enough. We compare them
-    // and average if there encode "equal" transformation.
-    else if(world2cam3Best.maxDistanceToEntry < thDistanceToLastUpdate){
-        world2camBest = SARTAveragerIfEqual(world2camBest, world2cam2Best);
-        world2camBest = SARTAveragerIfEqual(world2camBest, world2cam3Best);
+        return;
     }
 
-    // We finally set the transformation for world to camera.
-    world2camP = qPair2Matrix(qPair{world2camBest.qRot, world2camBest.qTra});
+    // Storage for all relative marker which can be updated
+    QVector<Landmark*> updatableMarker = QVector<Landmark*>();
 
-    /* Use the best transformation known from world to cam together with the current
-     * transformation from the orange house marker to the cam to calculate this transformation
-     * without having to query transmem again. */
-    world2orangeHouseNow = SARTMultiplier(SARTInverter(orangeHouse2camNow), world2camBest);
+    // Storage for all transformations mapping from a relative marker to the camera
+    QVector<StampedTransformationWithConfidence>  cam2relativeMarkersNow = QVector<StampedTransformationWithConfidence>();
 
-    StampedAndRatedTransformation world2orangeHouseBest, world2orangeHouse2Best;
+    // Storage for all best transformations mapping from the world center to a relative marker
+    QVector<StampedTransformationWithConfidence> world2relativeMarkersFix = QVector<StampedTransformationWithConfidence>();
 
-    // Find out which transformation is better, regarding the maxDistanceToEntry value
-    if(world2orangeHouseNow.maxDistanceToEntry < world2orangeHouseFix.maxDistanceToEntry){
-           world2orangeHouseBest = world2orangeHouseNow;
-           world2orangeHouse2Best = world2orangeHouseFix;
+    StampedTransformationWithConfidence relativeMarker2camNow, world2relativeMarkerFix, world2camOption;
+    std::string markerID;
+    for(Landmark* relativeMarker : relativeMarkers){
+
+        // just make sure we dont run into a null pointer here
+        if(relativeMarker == nullptr)
+            continue;
+
+         markerID = (relativeMarker->identifier).toStdString();
+
+         try{ relativeMarker2camNow = getLink(markerID, camID, tsNow); }
+         catch(NoSuchLinkFoundException){ continue; /* no link registered yet */ }
+
+         try{ world2relativeMarkerFix = getBestLink(worldID, markerID); }
+         catch(NoSuchLinkFoundException){ continue; /* no link registered yet */ }
+
+         // if the confidence is to low we assume the marker is not visible
+         relativeMarker->visible = !(relativeMarker2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
+         emit relativeMarker->visibilityUpdated();
+
+        world2camOption = SARTMultiplier(relativeMarker2camNow, world2relativeMarkerFix);
+
+        // if the existing mapping from world to the camera is already "good" and the same is true for the
+        // calculated alternative we average the two mappings
+        // if not, we take just the better one
+        if( world2camNow.maxDistanceToEntry < thDistanceToLastUpdate &&
+            world2camOption.maxDistanceToEntry < thDistanceToLastUpdate )
+
+            world2camNow = SARTAveragerIfEqual(world2camNow, world2camOption);
+        else
+            world2camNow = world2camNow.maxDistanceToEntry < world2camOption.maxDistanceToEntry ? world2camNow : world2camOption;
+
+        updatableMarker.push_back(relativeMarker);
+        cam2relativeMarkersNow.push_back(SARTInverter(relativeMarker2camNow));
+        world2relativeMarkersFix.push_back(world2relativeMarkerFix);
+
+      }
+
+    worldCenterMarker->relativePose = qPair2Matrix(qPair{world2camNow.rotation, world2camNow.translation});
+    emit worldCenterMarker->relativePoseUpdated();
+
+    // If no transformation from world to camera is good enough, that is the smallest value of maxDistanceToEntry
+    // for all three transformation is larger than the threshold thDistanceToLastUpdate, we set the world center
+    // marker to inactive.
+    if(world2camNow.maxDistanceToEntry > thDistanceToLastUpdate){
+        worldCenterMarker->visible = false;
+        emit worldCenterMarker->visibilityUpdated();
     }
-    else {
-           world2orangeHouseBest = world2orangeHouseFix;
-           world2orangeHouse2Best = world2orangeHouseNow;
+
+    StampedTransformationWithConfidence world2relativeMarkerNow;
+    for(int indx = 0; indx < updatableMarker.count(); indx++){
+
+        Landmark* updatedMarker = updatableMarker.at(indx);
+
+        // Use the best transformation known from world to cam together with the current
+        // transformation from the orange house marker to the cam to calculate this transformation
+        // without having to query transmem again.
+        world2relativeMarkerNow = SARTMultiplier(cam2relativeMarkersNow.at(indx), world2camNow);
+        world2relativeMarkerFix = world2relativeMarkersFix.at(indx);
+
+        if( world2relativeMarkerNow.maxDistanceToEntry < thDistanceToLastUpdate &&
+            world2relativeMarkerFix.maxDistanceToEntry < thDistanceToLastUpdate )
+
+            world2relativeMarkerNow = SARTAveragerIfEqual(world2relativeMarkerNow, world2relativeMarkerFix);
+        else
+            world2relativeMarkerNow = world2relativeMarkerNow.maxDistanceToEntry < world2relativeMarkerFix.maxDistanceToEntry ?
+                        world2relativeMarkerNow : world2relativeMarkerFix;
+
+        updatedMarker->relativePose = qPair2Matrix(qPair{world2relativeMarkerNow.rotation, world2relativeMarkerNow.translation});
+        updatedMarker->relativePoseUpdated();
+
+        if(world2relativeMarkerNow.maxDistanceToEntry > thDistanceToLastUpdate){
+            updatedMarker->visible = false;
+            updatedMarker->visibilityUpdated();
+        }
     }
 
-    /* If the best link from world 2 orange house is to bad, that is there exist no fix link which is good
-     * enough or the the needed links were not updated a reasonable time ago, we set the orange house object
-     * to inactive. */
-    if(world2orangeHouseBest.maxDistanceToEntry > thDistanceToLastUpdate)
-        world2orangeHouseActiveP = false;
-    // If both transformation are good enough, we compare and average them if they encode the "equal" transformation.
-    else if(world2orangeHouse2Best.maxDistanceToEntry < thDistanceToLastUpdate)
-        world2orangeHouseBest = SARTAveragerIfEqual(world2orangeHouseBest, world2orangeHouse2Best);
+//    // Monitoring functionality
+//    {
+//    // Tell the monitor about the updated transformation.
+//      emit transformationUpdate(world2camID, tsNow, world2camP, world2camBest.averageLinkConfidence, world2camBest.maxDistanceToEntry);
+//      emit transformationUpdate(world2orangeHouseID, tsNow, world2orangeHouseP, world2orangeHouseBest.averageLinkConfidence, world2orangeHouseBest.maxDistanceToEntry);
+//      emit transformationUpdate(world2adaHouseID, tsNow, world2adaHouseP, world2adaHouseBest.averageLinkConfidence, world2adaHouseBest.maxDistanceToEntry);
+//    }
 
-    // We set the transformation for world to orange house.
-    world2orangeHouseP = qPair2Matrix(qPair{world2orangeHouseBest.qRot, world2orangeHouseBest.qTra});
-
-    // Do the same for the ada house tracker.
-    world2adaHouseNow = SARTMultiplier(SARTInverter(adaHouse2camNow), world2camBest);
-
-    StampedAndRatedTransformation world2adaHouseBest, world2adaHouse2Best;
-    if(world2adaHouseNow.maxDistanceToEntry < world2adaHouseFix.maxDistanceToEntry){
-        world2adaHouseBest = world2adaHouseNow;
-        world2adaHouse2Best = world2adaHouseFix;
-    }
-    else {
-        world2adaHouseBest = world2adaHouseFix;
-        world2adaHouse2Best = world2adaHouseNow;
-    }
-
-    if(world2adaHouseBest.maxDistanceToEntry > thDistanceToLastUpdate)
-        world2adaHouseActiveP = false;
-    else if(world2adaHouse2Best.maxDistanceToEntry < thDistanceToLastUpdate)
-        world2adaHouseBest = SARTAveragerIfEqual(world2adaHouseBest, world2adaHouse2Best);
-
-    world2adaHouseP = qPair2Matrix(qPair{world2adaHouseBest.qRot, world2adaHouseBest.qTra});
-
-    // End of model specific implementation.
-    // *************************************/
-
-    // Tell the monitor about the updated transformation.
-      emit transformationUpdate(world2camID, tsNow, world2camP, world2camBest.avgLinkConfidence, world2camBest.maxDistanceToEntry);
-      emit transformationUpdate(world2orangeHouseID, tsNow, world2orangeHouseP, world2orangeHouseBest.avgLinkConfidence, world2orangeHouseBest.maxDistanceToEntry);
-      emit transformationUpdate(world2adaHouseID, tsNow, world2adaHouseP, world2adaHouseBest.avgLinkConfidence, world2adaHouseBest.maxDistanceToEntry);
-
-    // Inform the qml side of the model about the updated transformation.
-    emit transformationsUpdated();
 }
 
 // Monitoring functions for the qml interface
@@ -371,6 +337,7 @@ void MarkerModel::startMonitoring(){
 
     /* REMARK:
      * Could make the monitoring options choosable through the gui. */
+    /*
     emit registerLinkUpdateToMonitor(worldID, camID);
     emit registerLinkUpdateToMonitor(orangeHouseID, camID);
     emit registerLinkUpdateToMonitor(adaHouseID, camID);
@@ -378,43 +345,13 @@ void MarkerModel::startMonitoring(){
     emit registerTransformationToMonitor(world2camID);
     emit registerTransformationToMonitor(world2orangeHouseID);
     emit registerTransformationToMonitor(world2adaHouseID);
-
+    */
     emit startMonitor();
 }
 
 void MarkerModel::stopMonitoring(){
     emit stopMonitor();
 }
-
-// Helper functions for the qml interface
-
-QMatrix4x4 MarkerModel::world2cam(){
-    return world2camP;
-}
-
-QMatrix4x4 MarkerModel::world2orangeHouse(){
-    return world2orangeHouseP;
-}
-
-QMatrix4x4 MarkerModel::world2adaHouse(){
-    return world2adaHouseP;
-}
-
-bool MarkerModel::world2camActive(){
-    return world2camActiveP;
-}
-
-bool MarkerModel::world2orangeHouseActive(){
-    return world2orangeHouseActiveP;
-}
-
-bool MarkerModel::world2adaHouseActive(){
-    return world2adaHouseActiveP;
-}
-
-/**********************
- * MARKERMODELMONITOR *
- **********************/
 
 // Functions for monitoring
 
@@ -459,7 +396,7 @@ void MarkerModelMonitor::registerTransformationToMonitor(const std::string &tran
 }
 
 void MarkerModelMonitor::monitorTransformationUpdate(const std::string &transID, const Timestamp &ts, const QMatrix4x4 &trans,
-                                                     const float &avgLinkConfidence, const float &maxDistanceToEntry){
+                                                     const float &averageLinkConfidence, const float &maxDistanceToEntry){
     if(!currentlyMonitoring)
         return;
 
@@ -470,7 +407,7 @@ void MarkerModelMonitor::monitorTransformationUpdate(const std::string &transID,
     // Add entry to the corresponding container.
     std::list<TransformationUpdate> &refToTransf = ((*iter2monitoredTransformations).second);
     if(refToTransf.size() < MAX_NUMBER_OF_MONITORED_UPDATES_PER_TRANFORMATION)
-        refToTransf.push_back(TransformationUpdate{ts, matrix2qPair(trans), avgLinkConfidence, maxDistanceToEntry});
+        refToTransf.push_back(TransformationUpdate{ts, matrix2qPair(trans), averageLinkConfidence, maxDistanceToEntry});
 }
 
 void MarkerModelMonitor::startMonitoring() {
@@ -598,10 +535,6 @@ void MarkerModelMonitor::writeSingleAnalysisToFile(Analysis &analysis, const QSt
     }
 }
 
-/************************
- * LINK UPDATE ANALYSIS *
- ************************/
-
 void LinkUpdateAnalysis::doAnalysis(std::list<LinkUpdate> &input){
 
     // We need at least two entries to do this analysis
@@ -636,10 +569,6 @@ void LinkUpdateAnalysis::doAnalysis(std::list<LinkUpdate> &input){
     }
 }
 
-/****************************
- * LINK UPDATE FIX ANALYSIS *
- ****************************/
-
 void LinkUpdateFixAnalysis::doAnalysis(std::list<LinkUpdate> &input){
 
     // Sort all updates from ealierst to latest.
@@ -663,10 +592,6 @@ void LinkUpdateFixAnalysis::doAnalysis(std::list<LinkUpdate> &input){
        );
     }
 }
-
-/**********************************
- * TRANSFORMATION UPDATE ANALYSIS *
- **********************************/
 
 void TransformationUpdateAnalysis::doAnalysis(std::list<TransformationUpdate> &input) {
 
@@ -693,7 +618,7 @@ void TransformationUpdateAnalysis::doAnalysis(std::list<TransformationUpdate> &i
                         diff.y(),
                         diff.z(),
                         diff.w(),
-                        curTu.avgLinkConfidence,
+                        curTu.avgerageLinkConfidence,
                         curTu.maxDistanceToEntry
               }
        );
@@ -702,3 +627,50 @@ void TransformationUpdateAnalysis::doAnalysis(std::list<TransformationUpdate> &i
     }
 }
 
+
+// NEW STUFF ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+QQmlListProperty<Landmark> MarkerModel::worldCenterRelativeMarkers(){
+    return QQmlListProperty<Landmark>(this, this,
+             &MarkerModel::appendWorldCenterRelativeMarker,
+             &MarkerModel::worldCenterRelativeMarkersCount,
+             &MarkerModel::worldCenterRelativeMarker,
+             &MarkerModel::clearWorldCenterRelativeMarkers);
+}
+
+void MarkerModel::appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeMarker) {
+
+    connect(worldCenterRelativeMarker, &Landmark::changed, this, &MarkerModel::markerPositionUpdated);
+
+    relativeMarkers.append(worldCenterRelativeMarker);
+}
+
+int MarkerModel::worldCenterRelativeMarkersCount() const
+{
+    return relativeMarkers.count();
+}
+
+Landmark* MarkerModel::worldCenterRelativeMarker(int i) const
+{
+    return relativeMarkers.at(i);
+}
+
+void MarkerModel::clearWorldCenterRelativeMarkers() {
+    return relativeMarkers.clear();
+}
+
+void MarkerModel::appendWorldCenterRelativeMarker(QQmlListProperty<Landmark>* list, Landmark* p) {
+    reinterpret_cast< MarkerModel* >(list->data)->appendWorldCenterRelativeMarker(p);
+}
+
+void MarkerModel::clearWorldCenterRelativeMarkers(QQmlListProperty<Landmark>* list) {
+    reinterpret_cast< MarkerModel* >(list->data)->clearWorldCenterRelativeMarkers();
+}
+
+Landmark* MarkerModel::worldCenterRelativeMarker(QQmlListProperty<Landmark>* list, int i) {
+    return reinterpret_cast< MarkerModel* >(list->data)->worldCenterRelativeMarker(i);
+}
+
+int MarkerModel::worldCenterRelativeMarkersCount(QQmlListProperty<Landmark>* list) {
+    return reinterpret_cast< MarkerModel* >(list->data)->worldCenterRelativeMarkersCount();
+}

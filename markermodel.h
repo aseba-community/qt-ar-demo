@@ -14,6 +14,8 @@
 #include <unordered_map>
 #include <list>
 
+#include "thymio-ar/vision-video-filter.h"
+
 #include "transmem/transmem.h"
 
 typedef std::pair<QQuaternion, QQuaternion> qPair;
@@ -30,10 +32,10 @@ Q_DECLARE_METATYPE(std::string)
 const double thConfidenceMarkerVisible = 0.4;
 
 // Transmem is updated if the confidence of a marker is greater than this threshold.
-const double thConfidenceMarkerUpdate = 0.6;
+const double thConfidenceMarkerUpdate = 0.45;
 
 // A transformation is considered to be good enough if updated in a time smaller than this threshold.
-const double thDistanceToLastUpdate = 100;       // in ms
+const double thDistanceToLastUpdate = 250;       // in ms
 
 
 class MarkerModelMonitor;
@@ -59,51 +61,54 @@ public:
         monitorThread.wait();
     }
 
-    // QML interface
+    Q_PROPERTY(Landmark* worldCenterMarker READ getWorldCenterMarker WRITE setWorldCenterMarker)
+    Q_PROPERTY(QQmlListProperty<Landmark> worldCenterRelativeMarkers READ worldCenterRelativeMarkers)
 
-    Q_PROPERTY(QMatrix4x4 world2cam READ world2cam NOTIFY transformationsUpdated)
-    Q_PROPERTY(QMatrix4x4 world2orangeHouse READ world2orangeHouse NOTIFY transformationsUpdated)
-    Q_PROPERTY(QMatrix4x4 world2adaHouse READ world2adaHouse NOTIFY transformationsUpdated)
-
-    Q_PROPERTY(bool world2camActive READ world2camActive NOTIFY transformationsUpdated)
-    Q_PROPERTY(bool world2adaHouseActive READ world2adaHouseActive NOTIFY transformationsUpdated)
-    Q_PROPERTY(bool world2orangeHouseActive READ world2orangeHouseActive NOTIFY transformationsUpdated)
-
-    Q_INVOKABLE void updateLinkNow(const QString& srcFrame, const QString& destFrame, const QMatrix4x4& trans, float conf);
     Q_INVOKABLE void updateModel();
 
+    // QML Interface for the monitoring
     Q_INVOKABLE void startMonitoring();
     Q_INVOKABLE void stopMonitoring();
 
+
+    Landmark* worldCenterMarker;
+    QVector<Landmark*> relativeMarkers;
+
+    // PUT THIS OUTSIDE INTO CPP
+    void setWorldCenterMarker( Landmark* worldCenterMarker) {
+
+        this->worldCenterMarker = worldCenterMarker;
+
+        if(worldCenterMarker != nullptr)
+            connect(worldCenterMarker, &Landmark::changed, this, &MarkerModel::markerPositionUpdated);
+    }
+
+    Landmark* getWorldCenterMarker() { return worldCenterMarker; }
+
+
+    QQmlListProperty<Landmark> worldCenterRelativeMarkers();
+    void appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeMarker);
+    int worldCenterRelativeMarkersCount() const;
+    Landmark* worldCenterRelativeMarker(int i) const;
+    void clearWorldCenterRelativeMarkers();
+
+
+public slots:
+
+    // Invoked whenever the pose of a marker is updated
+    void markerPositionUpdated();
+
 private:
 
-    // Getter for the QML interface
-    QMatrix4x4 world2cam();
-    QMatrix4x4 world2orangeHouse();
-    QMatrix4x4 world2adaHouse();
+    bool worldCenterMarkerSeenOnce {false};
 
-    bool world2camActive();
-    bool world2orangeHouseActive();
-    bool world2adaHouseActive();
+    const std::string camID {"cam"};
 
-    // Private members (P for private)
-    QMatrix4x4 world2camP;
-    QMatrix4x4 world2orangeHouseP;
-    QMatrix4x4 world2adaHouseP;
-
-    bool world2camActiveP;
-    bool world2orangeHouseActiveP;
-    bool world2adaHouseActiveP;
-
-    // Private identifier which have to match the identifier used in qml.
-    const std::string camID = "cam";
-    const std::string worldID = "world";
-    const std::string orangeHouseID = "orangeHouse";
-    const std::string adaHouseID = "adaHouse";
-
-    const std::string world2camID = "world2cam";
-    const std::string world2orangeHouseID = "world2orangeHouse";
-    const std::string world2adaHouseID = "world2adaHouse";
+    // Functions neede for the qml interface
+    static void appendWorldCenterRelativeMarker(QQmlListProperty<Landmark>*, Landmark*);
+    static int worldCenterRelativeMarkersCount(QQmlListProperty<Landmark>*);
+    static Landmark* worldCenterRelativeMarker(QQmlListProperty<Landmark>*, int);
+    static void clearWorldCenterRelativeMarkers(QQmlListProperty<Landmark>*);
 
     // Thread which runs the monitoring.
     QThread monitorThread;
@@ -127,8 +132,6 @@ signals:
     void startMonitor();
     void stopMonitor();
 
-    // Signals for QML model
-    void transformationsUpdated();
 };
 
 /*****************************
@@ -150,7 +153,7 @@ struct LinkUpdate {
 struct TransformationUpdate  {
     Timestamp time;
     qPair transformation;
-    float avgLinkConfidence;
+    float avgerageLinkConfidence;
     float maxDistanceToEntry;
 };
 
