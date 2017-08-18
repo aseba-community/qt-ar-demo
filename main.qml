@@ -182,10 +182,7 @@ ApplicationWindow {
     Timer {
         running: true
         interval: 20
-        onTriggered: {
-            markermodel.updateModel()
-            console.log(orangeHouseLandmark.visible)
-        }
+        onTriggered: markermodel.updateModel()
         repeat: true
     }
 
@@ -239,8 +236,8 @@ ApplicationWindow {
 
         worldCenterMarker: worldCenterLandmark
         //worldCenterRelativeMarkers: [adaHouseLandmark]
-        //worldCenterRelativeMarkers: [orangeHouseLandmark]
-        worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
+        worldCenterRelativeMarkers: [orangeHouseLandmark]
+        //worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
 
         // model specific parameter
 

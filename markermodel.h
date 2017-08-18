@@ -18,10 +18,10 @@
 
 #include "transmem/transmem.h"
 
-typedef std::pair<QQuaternion, QQuaternion> qPair;
+typedef std::pair<QQuaternion, QVector3D> rotAndTransPair;
 
 Q_DECLARE_METATYPE(Timestamp)
-Q_DECLARE_METATYPE(qPair)
+Q_DECLARE_METATYPE(rotAndTransPair)
 Q_DECLARE_METATYPE(std::string)
 
 /************************************
@@ -29,14 +29,16 @@ Q_DECLARE_METATYPE(std::string)
  ************************************/
 
 // A marker is considered to be visible if the confidence is greater than this threshold.
-const double thConfidenceMarkerVisible = 0.4;
+const double thConfidenceMarkerVisible = 0.2;
 
 // Transmem is updated if the confidence of a marker is greater than this threshold.
 const double thConfidenceMarkerUpdate = 0.45;
 
 // A transformation is considered to be good enough if updated in a time smaller than this threshold.
-const double thDistanceToLastUpdate = 250;       // in ms
+const double thDistanceToLastUpdate = 100;       // in ms
 
+// A fix transformation is considered to be  good all updates are within this time
+const double thDistanceGoodFix = 250;
 
 class MarkerModelMonitor;
 
@@ -61,6 +63,7 @@ public:
         monitorThread.wait();
     }
 
+    // QML Interface for the marker model
     Q_PROPERTY(Landmark* worldCenterMarker READ getWorldCenterMarker WRITE setWorldCenterMarker)
     Q_PROPERTY(QQmlListProperty<Landmark> worldCenterRelativeMarkers READ worldCenterRelativeMarkers)
 
@@ -70,28 +73,12 @@ public:
     Q_INVOKABLE void startMonitoring();
     Q_INVOKABLE void stopMonitoring();
 
-
-    Landmark* worldCenterMarker;
-    QVector<Landmark*> relativeMarkers;
-
-    // PUT THIS OUTSIDE INTO CPP
-    void setWorldCenterMarker( Landmark* worldCenterMarker) {
-
-        this->worldCenterMarker = worldCenterMarker;
-
-        if(worldCenterMarker != nullptr)
-            connect(worldCenterMarker, &Landmark::changed, this, &MarkerModel::markerPositionUpdated);
-    }
-
-    Landmark* getWorldCenterMarker() { return worldCenterMarker; }
-
-
+    // Functions needed for the QML interface
     QQmlListProperty<Landmark> worldCenterRelativeMarkers();
     void appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeMarker);
     int worldCenterRelativeMarkersCount() const;
     Landmark* worldCenterRelativeMarker(int i) const;
     void clearWorldCenterRelativeMarkers();
-
 
 public slots:
 
@@ -100,11 +87,26 @@ public slots:
 
 private:
 
-    bool worldCenterMarkerSeenOnce {false};
+    // Storage for the marker
+    Landmark* worldCenterMarker;
+    QVector<Landmark*> relativeMarkers;
 
+    // Model specific functions
+    StampedTransformationWithConfidence multiplySTWC( const StampedTransformationWithConfidence &lhs, const StampedTransformationWithConfidence &rhs);
+    StampedTransformationWithConfidence averageSTWCifEqual(StampedTransformationWithConfidence &lhs, StampedTransformationWithConfidence &rhs);
+    StampedTransformationWithConfidence invertSTCW(StampedTransformationWithConfidence &lhs);
+
+    // Identifier of the camera frame
     const std::string camID {"cam"};
+    // Identifier of the world center marker, set through setWorldCenterMarker(..)
+    std::string worldID;
 
-    // Functions neede for the qml interface
+    // Functions needed for the qml interface
+
+    void setWorldCenterMarker( Landmark* worldCenterMarker);
+    Landmark* getWorldCenterMarker();
+
+
     static void appendWorldCenterRelativeMarker(QQmlListProperty<Landmark>*, Landmark*);
     static int worldCenterRelativeMarkersCount(QQmlListProperty<Landmark>*);
     static Landmark* worldCenterRelativeMarker(QQmlListProperty<Landmark>*, int);
@@ -120,7 +122,7 @@ signals:
     // Object emits this signal everytime it received an update for a tranformation through
     // updateLinkNow(..) from the QML model to inform the monitor also about the update.
     void linkUpdate(const std::string &srcFrame, const std::string &dstFrame, const Timestamp &ts,
-                    const qPair &transf, const float &conf);
+                    const rotAndTransPair &transf, const float &conf);
 
     // Object can emit this signal whenever a calculated transformation (result, output to QML model) was updated.
     void transformationUpdate(const std::string &transID, const Timestamp &ts, const QMatrix4x4 &trans,
@@ -141,7 +143,7 @@ signals:
 // Stores a single update of a link direct from the tracker.
 struct LinkUpdate {
     Timestamp time;
-    qPair transformation;
+    rotAndTransPair transformation;
     double confidence;
 };
 
@@ -152,7 +154,7 @@ struct LinkUpdate {
 // Stores a single update of a transformation used to draw an object.
 struct TransformationUpdate  {
     Timestamp time;
-    qPair transformation;
+    rotAndTransPair transformation;
     float avgerageLinkConfidence;
     float maxDistanceToEntry;
 };
@@ -166,10 +168,10 @@ struct AnalysisSingleResult {
 
     long tms;               // Elapsed time since analysis started in ms.
 
-    qPair tf;                       // Transformation
+    rotAndTransPair tf;                       // Transformation
 
     /* Values yield from the comparision of two transformation. For further
-     * information check the function compareqPair(..) and the implementation of the corrensponding
+     * information check the function comparerotAndTransPair(..) and the implementation of the corrensponding
      * analyses using this datatype to store their results. */
     double ratioLenT;
     double distanceNormalT;
@@ -188,7 +190,7 @@ struct AnalysisSingleResult {
 struct Analysis{
 
     // Don't allow creation of an object of this type.
-    virtual ~Analysis(){}
+    virtual ~Analysis() = default;
 
     Analysis(const Timestamp &tZero)
     : tZero(tZero)
@@ -233,7 +235,7 @@ struct LinkUpdateAnalysis : Analysis {
 
 struct LinkUpdateFixAnalysis : LinkUpdateAnalysis {
 
-    LinkUpdateFixAnalysis(const Timestamp &tsZero, const QString &srcFrame, const QString &destFrame, const qPair &fixT)
+    LinkUpdateFixAnalysis(const Timestamp &tsZero, const QString &srcFrame, const QString &destFrame, const rotAndTransPair &fixT)
     : LinkUpdateAnalysis(tsZero, srcFrame, destFrame)
     , fixT(fixT)
     {}
@@ -241,7 +243,7 @@ struct LinkUpdateFixAnalysis : LinkUpdateAnalysis {
     // Override
     void doAnalysis(std::list<LinkUpdate> &input);
 
-    qPair fixT;
+    rotAndTransPair fixT;
 };
 
 /************************************************
@@ -286,7 +288,7 @@ class MarkerModelMonitor : public QObject{
 public slots:
 
     void monitorLinkUpdate(const std::string &srcFrame, const std::string &destFrame, const Timestamp &ts,
-                           const qPair &transf, const float &conf);
+                           const rotAndTransPair &transf, const float &conf);
 
     void monitorTransformationUpdate(const std::string &transID, const Timestamp &ts, const QMatrix4x4 &trans,
                                      const float &avgLinkConfidence, const float &maxDistanceToEntry);
