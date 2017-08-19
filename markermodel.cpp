@@ -97,7 +97,7 @@ QVector3D avgVector3D(const QVector3D &v1, const QVector3D &v2){
 bool equalTransformation(const rotAndTransPair &qp1, const rotAndTransPair &qp2){
 
     // Parameter to decide if to transforamtion are equal.              ratioLenT   distanceNormalT  distanceNormalPointR  distanceNormalR
-    const QVector4D thTransformationEquality = QVector4D(        0.2,        0.2,             0.2,                  0.2);
+    const QVector4D thTransformationEquality = QVector4D(        0.,        0.,             0.,                  0.);
 
     QVector4D diff = compareRotAndTransPair(qp1, qp2);
 
@@ -178,12 +178,15 @@ StampedTransformationWithConfidence MarkerModel::averageSTWCifEqual(StampedTrans
     if(!encodeEqualTransformation)
         return lhs;
 
+    this->mediokerCounter++;
+    qDebug() << mediokerCounter;
+
     StampedTransformationWithConfidence ret;
 
     ret.rotation = avgAndNormalizeQuaternions(lhs.rotation, rhs.rotation);
     ret.translation = avgVector3D(lhs.translation, rhs.translation);
     ret.averageLinkConfidence = (lhs.averageLinkConfidence + rhs.averageLinkConfidence ) / 2;
-    ret.maxDistanceToEntry = (lhs.maxDistanceToEntry + rhs.maxDistanceToEntry) / 2.;
+    ret.maxDistanceToEntry = lhs.maxDistanceToEntry;
     ret.time = lhs.time;
 
     return ret;
@@ -213,13 +216,14 @@ void MarkerModel::updateModel(){
     // Get the transformation from the world center marker to the camera
     StampedTransformationWithConfidence world2camNow;
     try{ world2camNow = getLink(worldID, camID, tsNow); }
-    catch(NoSuchLinkFoundException){
-        // World center marker has to be seen once, so we return here.
-        return;
-    }
+    catch(NoSuchLinkFoundException){ /* world center marker not seen yet. */ }
 
     // World center marker is not visible if the confidence on the link Lcam<-wcm is to bad
     worldCenterMarker->visible = !(world2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
+
+    if(world2camNow.maxDistanceToEntry > thDistanceToLastUpdate)
+        worldCenterMarker->visible = false;
+
     emit worldCenterMarker->visibilityUpdated();
 
     unsigned int numberOfRelativeMarker = relativeMarkers.count();
@@ -291,14 +295,6 @@ void MarkerModel::updateModel(){
     worldCenterMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2camNow.rotation, world2camNow.translation});
     emit worldCenterMarker->relativePoseUpdated();
 
-    // If no transformation from world to camera is good enough, that is the smallest value of maxDistanceToEntry
-    // for all three transformation is larger than the threshold thDistanceToLastUpdate, we set the world center
-    // marker to inactive.
-    if(world2camNow.maxDistanceToEntry > thDistanceToLastUpdate){
-        worldCenterMarker->visible = false;
-        emit worldCenterMarker->visibilityUpdated();
-    }
-
     //
     StampedTransformationWithConfidence cam2relativeMarkerNow, world2relativeMarkerNow;
     for(int indx = 0; indx < updatableMarker.count(); indx++){
@@ -310,7 +306,7 @@ void MarkerModel::updateModel(){
 
         world2relativeMarkerNow = multiplySTWC(cam2relativeMarkerNow, world2camNow);
 
-        world2relativeMarkerNow = averageSTWCifEqual(world2relativeMarkerFix, world2relativeMarkerNow);
+        world2relativeMarkerNow = averageSTWCifEqual(world2relativeMarkerNow, world2relativeMarkerFix);
 
         updatedMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2relativeMarkerNow.rotation, world2relativeMarkerNow.translation});
 

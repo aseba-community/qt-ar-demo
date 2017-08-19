@@ -236,8 +236,8 @@ ApplicationWindow {
 
         worldCenterMarker: worldCenterLandmark
         //worldCenterRelativeMarkers: [adaHouseLandmark]
-        worldCenterRelativeMarkers: [orangeHouseLandmark]
-        //worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
+        //worldCenterRelativeMarkers: [orangeHouseLandmark]
+        worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
 
         // model specific parameter
 

@@ -29,7 +29,7 @@ Q_DECLARE_METATYPE(std::string)
  ************************************/
 
 // A marker is considered to be visible if the confidence is greater than this threshold.
-const double thConfidenceMarkerVisible = 0.2;
+const double thConfidenceMarkerVisible = 0.45;
 
 // Transmem is updated if the confidence of a marker is greater than this threshold.
 const double thConfidenceMarkerUpdate = 0.45;
@@ -79,6 +79,8 @@ public:
     int worldCenterRelativeMarkersCount() const;
     Landmark* worldCenterRelativeMarker(int i) const;
     void clearWorldCenterRelativeMarkers();
+
+    int mediokerCounter = 0;
 
 public slots:
 
