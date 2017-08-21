@@ -1,5 +1,7 @@
 #include "markermodel.h"
 
+#define RUN_WITHOUT_TRANSMEM
+
 // Helper functions
 
 // Creates the transformation matrix from a rotation quaternion and a translation vector
@@ -131,27 +133,6 @@ MarkerModel::MarkerModel(){
     }
 }
 
-// Slot gets called whenever the pose of a marker determined by the tracker was updated
-void MarkerModel::markerPositionUpdated(){
-
-    Timestamp tsNow = std::chrono::high_resolution_clock::now();
-
-    QObject *sender = QObject::sender();
-    Landmark *senderLandmark = qobject_cast<Landmark*>(sender);
-
-    QMatrix4x4 pose = senderLandmark->pose();
-    double confidence = senderLandmark->confidence();
-    std::string markerID = (senderLandmark->identifier).toStdString();
-
-    if(confidence >= thConfidenceMarkerUpdate)
-        registerLink(markerID, camID, tsNow, pose, confidence);
-    else
-        try { updateLinkConfidence(markerID, camID, confidence); }
-        catch(NoSuchLinkFoundException e) { /* Quality can just be updated if there was already a successful update. */ }
-
-    emit linkUpdate(camID, markerID, tsNow, matrix2rotAndTransPair(pose), confidence);
-}
-
 /* STWC = StampedTransformationWithConfidence) */
 
 // Multiplies two STWC objects
@@ -178,9 +159,6 @@ StampedTransformationWithConfidence MarkerModel::averageSTWCifEqual(StampedTrans
     if(!encodeEqualTransformation)
         return lhs;
 
-    this->mediokerCounter++;
-    qDebug() << mediokerCounter;
-
     StampedTransformationWithConfidence ret;
 
     ret.rotation = avgAndNormalizeQuaternions(lhs.rotation, rhs.rotation);
@@ -201,6 +179,36 @@ StampedTransformationWithConfidence MarkerModel::invertSTCW(StampedTransformatio
     return lhs;
 }
 
+
+// Slot gets called whenever the pose of a marker determined by the tracker was updated
+void MarkerModel::markerPositionUpdated(){
+
+    Timestamp tsNow = std::chrono::high_resolution_clock::now();
+
+    QObject *sender = QObject::sender();
+    Landmark *senderLandmark = qobject_cast<Landmark*>(sender);
+
+    QMatrix4x4 pose = senderLandmark->pose();
+    double confidence = senderLandmark->confidence();
+    std::string markerID = (senderLandmark->identifier).toStdString();
+
+    // If the marker model is ran without transmem we don't store anything in transmem
+    #ifdef RUN_WITHOUT_TRANSMEM
+        emit linkUpdate(markerID, camID, tsNow, matrix2rotAndTransPair(pose), confidence);
+        return;
+    #endif
+
+    #ifndef RUN_WITHOUT_TRANSMEM
+        if(confidence >= thConfidenceMarkerUpdate)
+            registerLink(markerID, camID, tsNow, pose, confidence);
+        else
+            try { updateLinkConfidence(markerID, camID, confidence); }
+            catch(NoSuchLinkFoundException e) { /* Quality can just be updated if there was already a successful update. */ }
+
+        emit linkUpdate(markerID, camID, tsNow, matrix2rotAndTransPair(pose), confidence);
+    #endif
+}
+
 // Whenever this function is called, the relative transformation for all marker are update with the best information available
 void MarkerModel::updateModel(){
 
@@ -213,17 +221,27 @@ void MarkerModel::updateModel(){
     // At what time do we want to update the model?
     Timestamp tsNow = std::chrono::high_resolution_clock::now();
 
-    // Get the transformation from the world center marker to the camera
+ // Transformation from the world center to the camera
     StampedTransformationWithConfidence world2camNow;
-    try{ world2camNow = getLink(worldID, camID, tsNow); }
-    catch(NoSuchLinkFoundException){ /* world center marker not seen yet. */ }
 
-    // World center marker is not visible if the confidence on the link Lcam<-wcm is to bad
+    #ifdef RUN_WITHOUT_TRANSMEM
+        rotAndTransPair rotAndTrans = matrix2rotAndTransPair(worldCenterMarker->pose());
+        world2camNow.rotation = rotAndTrans.first;
+        world2camNow.translation = rotAndTrans.second;
+        world2camNow.averageLinkConfidence = worldCenterMarker->confidence();
+        world2camNow.maxDistanceToEntry = 0.;
+    #endif
+
+    #ifndef RUN_WITHOUT_TRANSMEM
+        try{ world2camNow = getLink(worldID, camID, tsNow); }
+        catch(NoSuchLinkFoundException){ /* world center marker not seen yet. */ }
+    #endif
+
+    // The world center marker is not visible if the confidence is to bad
     worldCenterMarker->visible = !(world2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
 
     if(world2camNow.maxDistanceToEntry > thDistanceToLastUpdate)
         worldCenterMarker->visible = false;
-
     emit worldCenterMarker->visibilityUpdated();
 
     unsigned int numberOfRelativeMarker = relativeMarkers.count();
@@ -231,14 +249,35 @@ void MarkerModel::updateModel(){
     // If no additional marker are available, we can't do that much..
     if(numberOfRelativeMarker < 1){
 
-        // -> actually we can also check if it was updated shortly ago and use a stored transformation for quick support
-
         worldCenterMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2camNow.rotation, world2camNow.translation});
+
         emit worldCenterMarker->relativePoseUpdated();
         emit worldCenterMarker->visibilityUpdated();
         return;
     }
 
+    // We asume the last update of the pose happened right at the moment when we update the model
+    #ifdef RUN_WITHOUT_TRANSMEM
+        StampedTransformationWithConfidence relativeMarker2camNow;
+        for(Landmark* relativeMarker : relativeMarkers){
+
+            rotAndTransPair rotAndTrans = matrix2rotAndTransPair(relativeMarker->pose());
+            relativeMarker2camNow.rotation = rotAndTrans.first;
+            relativeMarker2camNow.translation = rotAndTrans.second;
+            relativeMarker2camNow.averageLinkConfidence = relativeMarker->confidence();
+            relativeMarker2camNow.maxDistanceToEntry = 0.;
+
+            relativeMarker->visible = !(relativeMarker2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
+
+            StampedTransformationWithConfidence world2relativeMarkerNow = multiplySTWC(invertSTCW(relativeMarker2camNow), world2camNow);
+            relativeMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2relativeMarkerNow.rotation, world2relativeMarkerNow.translation});
+
+            emit relativeMarker->relativePoseUpdated();
+            emit relativeMarker->visibilityUpdated();
+        }
+    #endif
+
+    #ifndef RUN_WITHOUT_TRANSMEM
     // Storage for all relative marker which can be updated
     QVector<Landmark*> updatableMarker = QVector<Landmark*>();
 
@@ -257,6 +296,11 @@ void MarkerModel::updateModel(){
             continue;
 
         markerID = (relativeMarker->identifier).toStdString();
+
+        // If the marker model is ran without transmem, we just dont have any information
+        // but the one that currently stored in any marker. So the only thing we can do is to
+        // calculate the position of the marker relative to the world center at the moment of the
+        // update.
 
         try{ relativeMarker2camNow = getLink(markerID, camID, tsNow); }
         catch(NoSuchLinkFoundException){ continue; /* no link registered yet */ }
@@ -292,9 +336,6 @@ void MarkerModel::updateModel(){
 
       }
 
-    worldCenterMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2camNow.rotation, world2camNow.translation});
-    emit worldCenterMarker->relativePoseUpdated();
-
     //
     StampedTransformationWithConfidence cam2relativeMarkerNow, world2relativeMarkerNow;
     for(int indx = 0; indx < updatableMarker.count(); indx++){
@@ -313,6 +354,10 @@ void MarkerModel::updateModel(){
         emit updatedMarker->relativePoseUpdated();
         emit updatedMarker->visibilityUpdated();
     }
+    #endif
+
+    worldCenterMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2camNow.rotation, world2camNow.translation});
+    emit worldCenterMarker->relativePoseUpdated();
 
 //    // Monitoring functionality
 //    {
@@ -339,11 +384,72 @@ void MarkerModel::startMonitoring(){
     emit registerTransformationToMonitor(world2orangeHouseID);
     emit registerTransformationToMonitor(world2adaHouseID);
     */
+
+    emit registerLinkUpdateToMonitor(worldCenterMarker->identifier.toStdString(), camID);
     emit startMonitor();
 }
 
 void MarkerModel::stopMonitoring(){
     emit stopMonitor();
+}
+
+// Set the world center marker and establish connection to get position updates
+void MarkerModel::setWorldCenterMarker( Landmark* worldCenterMarker) {
+
+    if(worldCenterMarker == nullptr)
+        return;
+
+    this->worldCenterMarker = worldCenterMarker;
+    this->worldID = (worldCenterMarker->identifier).toStdString();
+
+    connect(worldCenterMarker, &Landmark::changed, this, &MarkerModel::markerPositionUpdated);
+}
+
+Landmark* MarkerModel::getWorldCenterMarker() { return worldCenterMarker; }
+
+QQmlListProperty<Landmark> MarkerModel::worldCenterRelativeMarkers(){
+    return QQmlListProperty<Landmark>(this, this,
+             &MarkerModel::appendWorldCenterRelativeMarker,
+             &MarkerModel::worldCenterRelativeMarkersCount,
+             &MarkerModel::worldCenterRelativeMarker,
+             &MarkerModel::clearWorldCenterRelativeMarkers);
+}
+
+void MarkerModel::appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeMarker) {
+
+    connect(worldCenterRelativeMarker, &Landmark::changed, this, &MarkerModel::markerPositionUpdated);
+
+    relativeMarkers.append(worldCenterRelativeMarker);
+}
+
+int MarkerModel::worldCenterRelativeMarkersCount() const
+{
+    return relativeMarkers.count();
+}
+
+Landmark* MarkerModel::worldCenterRelativeMarker(int i) const
+{
+    return relativeMarkers.at(i);
+}
+
+void MarkerModel::clearWorldCenterRelativeMarkers() {
+    return relativeMarkers.clear();
+}
+
+void MarkerModel::appendWorldCenterRelativeMarker(QQmlListProperty<Landmark>* list, Landmark* p) {
+    reinterpret_cast< MarkerModel* >(list->data)->appendWorldCenterRelativeMarker(p);
+}
+
+void MarkerModel::clearWorldCenterRelativeMarkers(QQmlListProperty<Landmark>* list) {
+    reinterpret_cast< MarkerModel* >(list->data)->clearWorldCenterRelativeMarkers();
+}
+
+Landmark* MarkerModel::worldCenterRelativeMarker(QQmlListProperty<Landmark>* list, int i) {
+    return reinterpret_cast< MarkerModel* >(list->data)->worldCenterRelativeMarker(i);
+}
+
+int MarkerModel::worldCenterRelativeMarkersCount(QQmlListProperty<Landmark>* list) {
+    return reinterpret_cast< MarkerModel* >(list->data)->worldCenterRelativeMarkersCount();
 }
 
 // Functions for monitoring
@@ -618,65 +724,3 @@ void TransformationUpdateAnalysis::doAnalysis(std::list<TransformationUpdate> &i
     }
 }
 
-
-// NEW STUFF ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-// Set the world center marker and establish connection to get position updates
-void MarkerModel::setWorldCenterMarker( Landmark* worldCenterMarker) {
-
-    if(worldCenterMarker == nullptr)
-        return;
-
-    this->worldCenterMarker = worldCenterMarker;
-    this->worldID = (worldCenterMarker->identifier).toStdString();
-
-    connect(worldCenterMarker, &Landmark::changed, this, &MarkerModel::markerPositionUpdated);
-}
-
-Landmark* MarkerModel::getWorldCenterMarker() { return worldCenterMarker; }
-
-
-QQmlListProperty<Landmark> MarkerModel::worldCenterRelativeMarkers(){
-    return QQmlListProperty<Landmark>(this, this,
-             &MarkerModel::appendWorldCenterRelativeMarker,
-             &MarkerModel::worldCenterRelativeMarkersCount,
-             &MarkerModel::worldCenterRelativeMarker,
-             &MarkerModel::clearWorldCenterRelativeMarkers);
-}
-
-void MarkerModel::appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeMarker) {
-
-    connect(worldCenterRelativeMarker, &Landmark::changed, this, &MarkerModel::markerPositionUpdated);
-
-    relativeMarkers.append(worldCenterRelativeMarker);
-}
-
-int MarkerModel::worldCenterRelativeMarkersCount() const
-{
-    return relativeMarkers.count();
-}
-
-Landmark* MarkerModel::worldCenterRelativeMarker(int i) const
-{
-    return relativeMarkers.at(i);
-}
-
-void MarkerModel::clearWorldCenterRelativeMarkers() {
-    return relativeMarkers.clear();
-}
-
-void MarkerModel::appendWorldCenterRelativeMarker(QQmlListProperty<Landmark>* list, Landmark* p) {
-    reinterpret_cast< MarkerModel* >(list->data)->appendWorldCenterRelativeMarker(p);
-}
-
-void MarkerModel::clearWorldCenterRelativeMarkers(QQmlListProperty<Landmark>* list) {
-    reinterpret_cast< MarkerModel* >(list->data)->clearWorldCenterRelativeMarkers();
-}
-
-Landmark* MarkerModel::worldCenterRelativeMarker(QQmlListProperty<Landmark>* list, int i) {
-    return reinterpret_cast< MarkerModel* >(list->data)->worldCenterRelativeMarker(i);
-}
-
-int MarkerModel::worldCenterRelativeMarkersCount(QQmlListProperty<Landmark>* list) {
-    return reinterpret_cast< MarkerModel* >(list->data)->worldCenterRelativeMarkersCount();
-}

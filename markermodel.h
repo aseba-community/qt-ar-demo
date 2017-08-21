@@ -28,6 +28,8 @@ Q_DECLARE_METATYPE(std::string)
  * PARAMETER FOR THE MODEL          *
  ************************************/
 
+//TODO: setable through qml interface
+
 // A marker is considered to be visible if the confidence is greater than this threshold.
 const double thConfidenceMarkerVisible = 0.45;
 
@@ -65,6 +67,7 @@ public:
 
     // QML Interface for the marker model
     Q_PROPERTY(Landmark* worldCenterMarker READ getWorldCenterMarker WRITE setWorldCenterMarker)
+
     Q_PROPERTY(QQmlListProperty<Landmark> worldCenterRelativeMarkers READ worldCenterRelativeMarkers)
 
     Q_INVOKABLE void updateModel();
@@ -79,8 +82,6 @@ public:
     int worldCenterRelativeMarkersCount() const;
     Landmark* worldCenterRelativeMarker(int i) const;
     void clearWorldCenterRelativeMarkers();
-
-    int mediokerCounter = 0;
 
 public slots:
 
@@ -269,7 +270,7 @@ struct TransformationUpdateAnalysis : Analysis {
 };
 
 /****************************
- * MARKER MODEL              *
+ * MARKER MODEL MONITOR     *
  ****************************/
 
 /* REMARK:

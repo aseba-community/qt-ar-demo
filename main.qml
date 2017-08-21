@@ -181,7 +181,7 @@ ApplicationWindow {
     // Timer to update model.
     Timer {
         running: true
-        interval: 20
+        interval: 30
         onTriggered: markermodel.updateModel()
         repeat: true
     }
@@ -234,7 +234,7 @@ ApplicationWindow {
     MarkerModel {
         id: markermodel
 
-        worldCenterMarker: worldCenterLandmark
+        worldCenterMarker: orangeHouseLandmark //worldCenterLandmark
         //worldCenterRelativeMarkers: [adaHouseLandmark]
         //worldCenterRelativeMarkers: [orangeHouseLandmark]
         worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
