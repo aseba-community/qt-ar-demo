@@ -83,6 +83,8 @@ public:
     Landmark* worldCenterRelativeMarker(int i) const;
     void clearWorldCenterRelativeMarkers();
 
+    int avgCounter{0};
+
 public slots:
 
     // Invoked whenever the pose of a marker is updated
@@ -139,20 +141,16 @@ signals:
 
 };
 
-/*****************************
- * LINK UPDATE               *
- *****************************/
-
 // Stores a single update of a link direct from the tracker.
 struct LinkUpdate {
     Timestamp time;
     rotAndTransPair transformation;
     double confidence;
-};
 
-/*****************************
- * TRANSFORMATION UPDATE     *
- *****************************/
+    double timeSinceFirstRecordedUpdate;
+    QString srcFrame;
+    QString dstFrame;
+};
 
 // Stores a single update of a transformation used to draw an object.
 struct TransformationUpdate  {
@@ -160,129 +158,10 @@ struct TransformationUpdate  {
     rotAndTransPair transformation;
     float avgerageLinkConfidence;
     float maxDistanceToEntry;
+
+    double timeSinceFirstRecordedUpdate;
+    QString transformationID;
 };
-
-/*******************************
- * ANALYSIS SINGLE RESULT      *
- ******************************/
-
-// Stores a single result of an analysis.
-struct AnalysisSingleResult {
-
-    long tms;               // Elapsed time since analysis started in ms.
-
-    rotAndTransPair tf;                       // Transformation
-
-    /* Values yield from the comparision of two transformation. For further
-     * information check the function comparerotAndTransPair(..) and the implementation of the corrensponding
-     * analyses using this datatype to store their results. */
-    double ratioLenT;
-    double distanceNormalT;
-    double distanceNormalPointR;
-    double distanceNormalR;
-
-    double conf;                    // Confidence
-    double distanceToEntry;
-};
-
-/*****************************
- * TRANSFORMATION UPDATE     *
- *****************************/
-
-// Basic type of an analysis.
-struct Analysis{
-
-    // Don't allow creation of an object of this type.
-    virtual ~Analysis() = default;
-
-    Analysis(const Timestamp &tZero)
-    : tZero(tZero)
-    {}
-
-    Timestamp tZero;
-    // Container for all the results.
-    std::list<AnalysisSingleResult> results;
-};
-
-/************************************************
- * LINK UPDATE ANALYSIS *
- ************************************************/
-
-/* This analysis compares the for each link update, the transformation with the transformation
- * of the link update happened right before this update. The difference (ratioLenT, distanceNormalT,
- * distanceNormalPointR and distanceNormalR) for each link update is stored together with
- * additional information (time when the update happened, confidence of the update and the actual transformation)
- * in a AnalysisSingleResult instance. */
-
-struct LinkUpdateAnalysis : Analysis {
-
-    LinkUpdateAnalysis(const Timestamp &tsZero, const QString &srcFrame, const QString &destFrame)
-    : Analysis(tsZero)
-    , srcFrame(srcFrame)
-    , destFrame(destFrame)
-    {}
-
-    void doAnalysis(std::list<LinkUpdate> &input);
-
-    const QString srcFrame;
-    const QString destFrame;
-
-};
-
-/************************************************
- * LINK UPDATE FIX ANALYSIS *
- ************************************************/
-
-// This Analyis works like the LinkUpdateAnalysis with the exception that each link update is compared against
-// a fix transformation fixT.
-
-struct LinkUpdateFixAnalysis : LinkUpdateAnalysis {
-
-    LinkUpdateFixAnalysis(const Timestamp &tsZero, const QString &srcFrame, const QString &destFrame, const rotAndTransPair &fixT)
-    : LinkUpdateAnalysis(tsZero, srcFrame, destFrame)
-    , fixT(fixT)
-    {}
-
-    // Override
-    void doAnalysis(std::list<LinkUpdate> &input);
-
-    rotAndTransPair fixT;
-};
-
-/************************************************
- * TRANSFORMATION UPDATE ANALYSIS               *
- ************************************************/
-
-/* This Analyis works like the LinkUpdateAnalysis with the exception that not the confidence
- * but the average confidence (avgLinkConfidence) of a links contributing to the transformation
- * and the maxDistToEntry as a quality measurement is stored in a AnalysisSingleResult instance. */
-
-struct TransformationUpdateAnalysis : Analysis {
-
-    TransformationUpdateAnalysis(const Timestamp &tsZero, const QString &transID)
-    : Analysis(tsZero)
-    , transID(transID)
-    {}
-
-    void doAnalysis(std::list<TransformationUpdate> &input);
-
-    const QString transID;
-};
-
-/****************************
- * MARKER MODEL MONITOR     *
- ****************************/
-
-/* REMARK:
- * Allows to monitor the link and transformation updates and to
- * dump the raw data or the already analyzed of the monitoring to files.
- *
- * Link update:    Transfromation between a source frame and a destination frame at a certain
- *                 point together with a timestamp. We get this from the tracking algorithm.
- *
- * Transformation update:   Calculated transformation from a source frame to a a destination frame
- *                          together with the quality information (avgLinkConfidence, maxDiffToEntry).
- *                          This is the output the model generates. */
 
 class MarkerModelMonitor : public QObject{
 
@@ -304,6 +183,8 @@ public slots:
 
 protected:
 
+
+
     // Container for the monitored link updates.
     std::unordered_map<std::string, std::list<LinkUpdate> > monitoredLinkUpdates;
     std::unordered_map<std::string, std::pair<std::string, std::string> > monitoredLinkIdentifier;
@@ -323,10 +204,11 @@ protected:
 
     bool currentlyMonitoring = false;
 
-    void doAndWriteTransformationUpdateAnalyses(const QString &path);
-    void doAndWriteLinkUpdateAnalyses(const QString &path);
+    void writeAllTransformationUpateRecordsToFile(const QString &path);
+    void writeAllLinkUpateRecordsToFile(const QString &path);
 
-    void writeSingleAnalysisToFile(Analysis &analysis, const QString &path);
+    void writeSingleLinkUpdateRecordToFile(std::list<LinkUpdate>& output, const QString &path, bool appenSRCandDST);
+    void writeSingleTransforamtionUpdateRecordToFile(std::list<TransformationUpdate>& output, const QString &path);
 };
 
 #endif // MARKERMODEL_H

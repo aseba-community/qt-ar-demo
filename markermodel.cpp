@@ -1,6 +1,6 @@
 #include "markermodel.h"
 
-#define RUN_WITHOUT_TRANSMEM
+//#define RUN_WITHOUT_TRANSMEM
 
 // Helper functions
 
@@ -42,10 +42,6 @@ QVector4D compareRotAndTransPair(const rotAndTransPair &qp1, const rotAndTransPa
     qp1.first.getAxisAndAngle(&vRotA1, &fAngl1);
     qp2.first.getAxisAndAngle(&vRotA2, &fAngl2);
 
-    // Make sure the two rotation axes are comparable.
-    if(vRotA1.z() < 0 ){ vRotA1 *= -1; fAngl1 = 360 - fAngl1; }
-    if(vRotA2.z() < 0 ){ vRotA2 *= -1; fAngl2 = 360 - fAngl2; }
-
     // Calculate ratio between the length of the two translation vectors and map them to the interval [0,2].
     double ratioLenT;
     double lenT1 = vTra1.length(), lenT2 = vTra2.length();
@@ -60,18 +56,36 @@ QVector4D compareRotAndTransPair(const rotAndTransPair &qp1, const rotAndTransPa
     vTra1.normalize(); vTra2.normalize();
     double distanceNormalT = fabs((vTra1 - vTra2).length());
 
+    // Make sure the two rotation axes are comparable.
+    if(vRotA1.z() < 0 ){ vRotA1 *= -1; fAngl1 = 360 - fAngl1; }
+    if(vRotA2.z() < 0 ){ vRotA2 *= -1; fAngl2 = 360 - fAngl2; }
+
     // Calculate the distance between a point perpendicular to the rotation axis
     // with length one and this point rotated by the angle difference.
-    double distanceNormalPointR = sqrt(2*(1-cos((fAngl1-fAngl2)*toRad)));
+    double distanceNormalPointRSameDir = sqrt(2*(1-cos((fAngl1-fAngl2)*toRad)));
+    double distanceNormalPointROppositeDir = sqrt(2*(1-cos((fAngl1+fAngl2)*toRad)));
 
     // Calculate the distance between the two rotation vectors.
     vRotA1.normalize(); vRotA2.normalize();
-    double distanceNormalR = fabs((vRotA1 - vRotA2).length());
+    double distRotAxesSameDir = fabs((vRotA1 - vRotA2).length());
+    double distRotAxesOppositeDir = fabs(((vRotA1) - (vRotA2*-1)).length());
+
+
+    double distanceNormalPointR, distRotAxesZ;
+    if(distRotAxesSameDir <= distRotAxesOppositeDir){
+        distRotAxesZ = distRotAxesSameDir;
+        distanceNormalPointR = distanceNormalPointRSameDir;
+    }
+    else{
+        distRotAxesZ = distRotAxesOppositeDir;
+        distanceNormalPointR = distanceNormalPointROppositeDir;
+    }
 
     // Return a vector encoding the "difference" between two transformations.
     // For equal transformation the method returns QVector4D(0,0,0,0).
                         //x             //y                 //z                     //w
-    return QVector4D(   ratioLenT,     distanceNormalT,    distanceNormalPointR,   distanceNormalR);
+    return QVector4D(   ratioLenT,     distanceNormalT,    distanceNormalPointR,   distRotAxesZ);
+
 }
 
 // Average two quaternions and normalized them afterwards
@@ -99,7 +113,7 @@ QVector3D avgVector3D(const QVector3D &v1, const QVector3D &v2){
 bool equalTransformation(const rotAndTransPair &qp1, const rotAndTransPair &qp2){
 
     // Parameter to decide if to transforamtion are equal.              ratioLenT   distanceNormalT  distanceNormalPointR  distanceNormalR
-    const QVector4D thTransformationEquality = QVector4D(        0.,        0.,             0.,                  0.);
+    const QVector4D thTransformationEquality = QVector4D(        0.2,        0.2,             0.2,                  0.2);
 
     QVector4D diff = compareRotAndTransPair(qp1, qp2);
 
@@ -224,6 +238,8 @@ void MarkerModel::updateModel(){
  // Transformation from the world center to the camera
     StampedTransformationWithConfidence world2camNow;
 
+
+    {
     #ifdef RUN_WITHOUT_TRANSMEM
         rotAndTransPair rotAndTrans = matrix2rotAndTransPair(worldCenterMarker->pose());
         world2camNow.rotation = rotAndTrans.first;
@@ -231,6 +247,7 @@ void MarkerModel::updateModel(){
         world2camNow.averageLinkConfidence = worldCenterMarker->confidence();
         world2camNow.maxDistanceToEntry = 0.;
     #endif
+    }
 
     #ifndef RUN_WITHOUT_TRANSMEM
         try{ world2camNow = getLink(worldID, camID, tsNow); }
@@ -256,6 +273,8 @@ void MarkerModel::updateModel(){
         return;
     }
 
+
+    {
     // We asume the last update of the pose happened right at the moment when we update the model
     #ifdef RUN_WITHOUT_TRANSMEM
         StampedTransformationWithConfidence relativeMarker2camNow;
@@ -276,6 +295,7 @@ void MarkerModel::updateModel(){
             emit relativeMarker->visibilityUpdated();
         }
     #endif
+    }
 
     #ifndef RUN_WITHOUT_TRANSMEM
     // Storage for all relative marker which can be updated
@@ -359,13 +379,9 @@ void MarkerModel::updateModel(){
     worldCenterMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2camNow.rotation, world2camNow.translation});
     emit worldCenterMarker->relativePoseUpdated();
 
-//    // Monitoring functionality
-//    {
-//    // Tell the monitor about the updated transformation.
-//      emit transformationUpdate(world2camID, tsNow, world2camP, world2camBest.averageLinkConfidence, world2camBest.maxDistanceToEntry);
-//      emit transformationUpdate(world2orangeHouseID, tsNow, world2orangeHouseP, world2orangeHouseBest.averageLinkConfidence, world2orangeHouseBest.maxDistanceToEntry);
-//      emit transformationUpdate(world2adaHouseID, tsNow, world2adaHouseP, world2adaHouseBest.averageLinkConfidence, world2adaHouseBest.maxDistanceToEntry);
-//    }
+    // Monitoring functionality
+    // Tell the monitor about the updated world to cam transformation.
+    emit transformationUpdate("world2cam", tsNow, worldCenterMarker->relativePose, world2camNow.averageLinkConfidence, world2camNow.maxDistanceToEntry);
 
 }
 
@@ -373,23 +389,19 @@ void MarkerModel::updateModel(){
 
 void MarkerModel::startMonitoring(){
 
-    /* REMARK:
-     * Could make the monitoring options choosable through the gui. */
     /*
-    emit registerLinkUpdateToMonitor(worldID, camID);
-    emit registerLinkUpdateToMonitor(orangeHouseID, camID);
-    emit registerLinkUpdateToMonitor(adaHouseID, camID);
-
-    emit registerTransformationToMonitor(world2camID);
-    emit registerTransformationToMonitor(world2orangeHouseID);
-    emit registerTransformationToMonitor(world2adaHouseID);
+    for(Landmark* l : relativeMarkers){
+         emit registerLinkUpdateToMonitor(l->identifier.toStdString(), camID);
+    }
     */
-
     emit registerLinkUpdateToMonitor(worldCenterMarker->identifier.toStdString(), camID);
+
+    //registerTransformationToMonitor("world2cam");
     emit startMonitor();
 }
 
 void MarkerModel::stopMonitoring(){
+    qDebug() << avgCounter;
     emit stopMonitor();
 }
 
@@ -526,7 +538,7 @@ void MarkerModelMonitor::stopMonitoring() {
 
     // Create folder where we store all the dumped files for each analysis.
     QDateTime currentTime = QDateTime::currentDateTime();
-    QString folderPath = PATH + "Analysis_" + currentTime.toString("ddMMyy_HHmmss") + "/";
+    QString folderPath = PATH + "Recording_" + currentTime.toString("ddMMyy_HHmmss") + "/";
 
     QDir dir;
     int dirExists = dir.exists(folderPath);
@@ -537,9 +549,9 @@ void MarkerModelMonitor::stopMonitoring() {
      * At the moment all possible analyses are done and written to a file for all tracked link
      * and transformation updates as soon the monitoring is stopped. It would make sense to make the analyses
      * choosable through a gui.ation strongly depends in a later step. */
-    doAndWriteLinkUpdateAnalyses(folderPath);
 
-    doAndWriteTransformationUpdateAnalyses(folderPath);
+    writeAllLinkUpateRecordsToFile(folderPath);
+    writeAllTransformationUpateRecordsToFile(folderPath);
 
     // Clean up all container for the next monitoring session.
     monitoredLinkIdentifier.clear();
@@ -549,22 +561,28 @@ void MarkerModelMonitor::stopMonitoring() {
     currentlyMonitoring = false;
 }
 
-void MarkerModelMonitor::doAndWriteTransformationUpdateAnalyses(const QString &path){
+void MarkerModelMonitor::writeAllTransformationUpateRecordsToFile(const QString &path){
 
     // Do a transformation update analysis for all monitored transformations and write
     // each of it to a seperate file.
     auto iter2 = monitoredTransformation.begin();
     while(iter2 != monitoredTransformation.end()){
+
         QString transID = QString::fromStdString((*iter2).first);
 
-        TransformationUpdateAnalysis tua = TransformationUpdateAnalysis(monitoringStartedAt, transID);
-        tua.doAnalysis((*iter2).second);
-        writeSingleAnalysisToFile(tua, path + "Transformation_Update_Analysis_" + transID);
+        std::list<TransformationUpdate> recordToWrite = (*iter2).second;
+
+        for(TransformationUpdate& tu : recordToWrite){
+            tu.timeSinceFirstRecordedUpdate = ((std::chrono::duration_cast<std::chrono::milliseconds>(tu.time - monitoringStartedAt)).count());
+            tu.transformationID;
+        }
+
+        writeSingleTransforamtionUpdateRecordToFile(recordToWrite, path + "Transformation_Update_Record_" + transID);
         iter2++;
     }
 }
 
-void MarkerModelMonitor::doAndWriteLinkUpdateAnalyses(const QString &path){
+void MarkerModelMonitor::writeAllLinkUpateRecordsToFile(const QString &path){
 
     // Do a link update analysis for all monitored link updates and write each of it to a seperate file.
     auto iter = monitoredLinkUpdates.begin();
@@ -572,16 +590,22 @@ void MarkerModelMonitor::doAndWriteLinkUpdateAnalyses(const QString &path){
 
         std::string linkID = (*iter).first;
         QString srcFrame = QString::fromStdString((monitoredLinkIdentifier.at(linkID)).first);
-        QString destFrame = QString::fromStdString((monitoredLinkIdentifier.at(linkID)).second);
+        QString dstFrame = QString::fromStdString((monitoredLinkIdentifier.at(linkID)).second);
 
-        LinkUpdateAnalysis lua = LinkUpdateAnalysis(monitoringStartedAt, srcFrame, destFrame);
-        lua.doAnalysis(monitoredLinkUpdates.at(linkID));
-        writeSingleAnalysisToFile(lua, path  + "Link_Update_Analysis_" + srcFrame + "_" + destFrame);
+        std::list<LinkUpdate> recordToWrite = monitoredLinkUpdates.at(linkID);
+
+        for(LinkUpdate& lu: recordToWrite){
+            lu.timeSinceFirstRecordedUpdate = ((std::chrono::duration_cast<std::chrono::milliseconds>(lu.time - monitoringStartedAt)).count());
+            lu.srcFrame = srcFrame;
+            lu.dstFrame = dstFrame;
+        }
+
+        writeSingleLinkUpdateRecordToFile(recordToWrite, path  + "Link_Update_Record_" + srcFrame + "_" + dstFrame, false);
         iter++;
     }
 }
 
-void MarkerModelMonitor::writeSingleAnalysisToFile(Analysis &analysis, const QString &path){
+void MarkerModelMonitor::writeSingleLinkUpdateRecordToFile(std::list<LinkUpdate> &output, const QString &path, bool appenSRCandDST){
 
     const QString lineSeperator = ",", newLine = "\n";
 
@@ -593,37 +617,26 @@ void MarkerModelMonitor::writeSingleAnalysisToFile(Analysis &analysis, const QSt
 
     QTextStream out(&file);
 
-    // If a LinkUpdateFixAnalysis is written to a file, the first data line contains
-    // the fix transformation.
-    if(typeid(analysis) == typeid(LinkUpdateFixAnalysis)){
+    for(LinkUpdate lu : output){
 
-        LinkUpdateFixAnalysis a = dynamic_cast<LinkUpdateFixAnalysis&>(analysis);
+        out << QString::number(lu.timeSinceFirstRecordedUpdate)     << lineSeperator
+            << QString::number(lu.transformation.first.scalar())    << lineSeperator
+            << QString::number(lu.transformation.first.x())         << lineSeperator
+            << QString::number(lu.transformation.first.y())         << lineSeperator
+            << QString::number(lu.transformation.first.z())         << lineSeperator
+            << QString::number(lu.transformation.second.x())        << lineSeperator
+            << QString::number((lu.transformation.second.y()))      << lineSeperator
+            << QString::number(lu.transformation.second.z())        << lineSeperator
+            << QString::number(lu.confidence);
 
-        out << QString::number(a.fixT.first.scalar())      << lineSeperator
-            << QString::number(a.fixT.first.x())           << lineSeperator
-            << QString::number(a.fixT.first.y())           << lineSeperator
-            << QString::number(a.fixT.first.z())           << lineSeperator
-            << QString::number(a.fixT.second.x())          << lineSeperator
-            << QString::number(a.fixT.second.y())          << lineSeperator
-            << QString::number(a.fixT.second.z())          << newLine;
+        if(appenSRCandDST){
+            out << lineSeperator
+                << lu.srcFrame                                          << lineSeperator
+                << lu.dstFrame;
+        }
+            out << newLine;
+
     }
-
-   for(AnalysisSingleResult &r : analysis.results)
-
-       out << QString::number(r.tms)                      << lineSeperator
-           << QString::number(r.tf.first.scalar())        << lineSeperator
-           << QString::number(r.tf.first.x())             << lineSeperator
-           << QString::number(r.tf.first.y())             << lineSeperator
-           << QString::number(r.tf.first.z())             << lineSeperator
-           << QString::number(r.tf.second.x())            << lineSeperator
-           << QString::number(r.tf.second.y())            << lineSeperator
-           << QString::number(r.tf.second.z())            << lineSeperator
-           << QString::number(r.ratioLenT)                << lineSeperator
-           << QString::number(r.distanceNormalT)          << lineSeperator
-           << QString::number(r.distanceNormalPointR)     << lineSeperator
-           << QString::number(r.distanceNormalR)          << lineSeperator
-           << QString::number(r.conf)                     << lineSeperator
-           << QString::number(r.distanceToEntry)          << newLine;
 
     file.close();
     if(file.error()){
@@ -632,95 +645,36 @@ void MarkerModelMonitor::writeSingleAnalysisToFile(Analysis &analysis, const QSt
     }
 }
 
-void LinkUpdateAnalysis::doAnalysis(std::list<LinkUpdate> &input){
+void MarkerModelMonitor::writeSingleTransforamtionUpdateRecordToFile(std::list<TransformationUpdate> &output, const QString &path){
 
-    // We need at least two entries to do this analysis
-    if(input.size() < 2)
+    const QString lineSeperator = ",", newLine = "\n";
+
+    QFile file(path + ".m");
+    if(!file.open(QFile::WriteOnly | QFile::Text)){
+        qDebug() << file.errorString();
         return;
-
-    // Sort all updates from ealierst to latest.
-    auto comperator = ([](const LinkUpdate &lu1, const LinkUpdate &lu2) { return lu1.time > lu2.time;});
-    input.sort(comperator);
-
-    auto iter = input.begin();
-    LinkUpdate preLu = (*iter), curLu;
-    iter++;
-    while(iter != input.end()){
-        curLu = (*iter);
-        // Compare transformation of current update against the transformation of previous update and store result.
-        QVector4D diff = compareRotAndTransPair(preLu.transformation, curLu.transformation);
-        results.push_front(
-                    AnalysisSingleResult{
-                        ((std::chrono::duration_cast<std::chrono::milliseconds>(curLu.time - tZero)).count()),
-                        curLu.transformation,
-                        diff.x(),
-                        diff.y(),
-                        diff.z(),
-                        diff.w(),
-                        curLu.confidence,
-                        0.
-              }
-       );
-       preLu = curLu;
-       iter++;
     }
-}
 
-void LinkUpdateFixAnalysis::doAnalysis(std::list<LinkUpdate> &input){
+    QTextStream out(&file);
 
-    // Sort all updates from ealierst to latest.
-    auto comperator = ([](const LinkUpdate &lu1, const LinkUpdate &lu2) { return lu1.time > lu2.time;});
-    input.sort(comperator);
+    for(TransformationUpdate tu : output){
 
-    for(LinkUpdate &l : input){
-        // Compare transformation of current update against the fix transformation fixT and store result.
-        QVector4D diff = compareRotAndTransPair(l.transformation, fixT);
-        results.push_front(
-                    AnalysisSingleResult{
-                        (std::chrono::duration_cast<std::chrono::milliseconds>(l.time - tZero)).count(),
-                        l.transformation,
-                        diff.x(),
-                        diff.y(),
-                        diff.z(),
-                        diff.w(),
-                        l.confidence,
-                        0
-                    }
-       );
+        out << QString::number(tu.timeSinceFirstRecordedUpdate)     << lineSeperator
+            << QString::number(tu.transformation.first.scalar())    << lineSeperator
+            << QString::number(tu.transformation.first.x())         << lineSeperator
+            << QString::number(tu.transformation.first.y())         << lineSeperator
+            << QString::number(tu.transformation.first.z())         << lineSeperator
+            << QString::number(tu.transformation.second.x())        << lineSeperator
+            << QString::number((tu.transformation.second.y()))      << lineSeperator
+            << QString::number(tu.transformation.second.z())        << newLine;
+
+            //<< QString::number(tu.avgerageLinkConfidence)           << lineSeperator
+            //<< QString::number(tu.maxDistanceToEntry)               << newLine;
     }
-}
 
-void TransformationUpdateAnalysis::doAnalysis(std::list<TransformationUpdate> &input) {
-
-    // We need at least two entries to do this analysis.
-    if(input.size() < 2)
+    file.close();
+    if(file.error()){
+        qDebug() << file.errorString();
         return;
-
-    // Sort all transformation updates from ealierst to latest.
-    auto comperator = ([](const TransformationUpdate &lu1, const TransformationUpdate &lu2) { return lu1.time > lu2.time;});
-    input.sort(comperator);
-
-    auto iter = input.begin();
-    TransformationUpdate preTu = (*iter), curTu;
-    iter++;
-    while(iter != input.end()){
-        curTu = (*iter);
-        // Compare transformation of current update against the transformation of the previous update and store result.
-        QVector4D diff = compareRotAndTransPair(preTu.transformation, curTu.transformation);
-        results.push_front(
-                    AnalysisSingleResult{
-                        (std::chrono::duration_cast<std::chrono::milliseconds>(curTu.time - tZero)).count(),
-                        curTu.transformation,
-                        diff.x(),
-                        diff.y(),
-                        diff.z(),
-                        diff.w(),
-                        curTu.avgerageLinkConfidence,
-                        curTu.maxDistanceToEntry
-              }
-       );
-       preTu = curTu;
-       iter++;
     }
 }
-

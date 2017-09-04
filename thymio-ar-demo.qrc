@@ -27,5 +27,6 @@
         <file>icons/ic_experiment_filter_off_24px.svg</file>
         <file>icons/ic_monitoring_off_24px.svg</file>
         <file>icons/ic_monitoring_on_24px.svg</file>
+        <file>Protagonist.qml</file>
     </qresource>
 </RCC>

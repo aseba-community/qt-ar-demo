@@ -14,6 +14,8 @@ import QtSensors 5.0
 import ExperimentFilter 1.0
 import MarkerModel 1.0
 
+import Qt3D.Extras 2.0
+
 ApplicationWindow {
 	id: window
 	title: qsTr("Thymio AR demo")
@@ -167,6 +169,9 @@ ApplicationWindow {
 	}
 
 
+
+
+
     // HACK
     Timer {
         running: true
@@ -181,9 +186,34 @@ ApplicationWindow {
     // Timer to update model.
     Timer {
         running: true
-        interval: 30
-        onTriggered: markermodel.updateModel()
+        interval: 20
+        onTriggered: { markermodel.updateModel();
+        sphereTransform.userTrans = ((sphereTransform.userTrans + 1)%20);}
         repeat: true
+    }
+
+
+    //
+    Transform {
+        id: sphereTransform
+        property real userAngle: 0.0
+        property real userTrans: 0.0
+        matrix: {
+            var m = Qt.matrix4x4();
+            m.rotate(userAngle, Qt.vector3d(0, 0, 1));
+            m.translate(Qt.vector3d(1/userTrans, 0, 0));
+            m.scale(Qt.vector3d(2,2,2));
+            return m;
+        }
+    }
+
+    SphereMesh {
+        id: sphereMesh
+        radius: 0.3
+    }
+
+    PhongMaterial {
+        id: material
     }
 
 	Vision {
@@ -191,13 +221,13 @@ ApplicationWindow {
         active: true
 
         landmarks: [
-			Landmark {
+            Landmark {
 				id: worldCenterLandmark
                 identifier: "world"
 				fileName: ":/assets/markers/worldcenter.xml"
 				property string icon: "assets/markers/worldcenter_tracker.png"
             },
-			Landmark {
+            Landmark {
 				id: orangeHouseLandmark
                 identifier: "orangeHouse"
                 fileName: ":/assets/markers/orangehouse.xml"
@@ -234,9 +264,7 @@ ApplicationWindow {
     MarkerModel {
         id: markermodel
 
-        worldCenterMarker: orangeHouseLandmark //worldCenterLandmark
-        //worldCenterRelativeMarkers: [adaHouseLandmark]
-        //worldCenterRelativeMarkers: [orangeHouseLandmark]
+        worldCenterMarker: worldCenterLandmark
         worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
 
         // model specific parameter
@@ -266,6 +294,11 @@ ApplicationWindow {
                id: adaHouse
                t: adaHouseLandmark.relativePose
                enabled: adaHouseLandmark.visible
+           }
+
+           Protagonist {
+                id: protagonist
+                enabled: false
            }
         }
 
