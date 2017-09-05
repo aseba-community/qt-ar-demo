@@ -4,6 +4,7 @@ import QtQuick.Dialogs 1.2
 import QtQuick.Layouts 1.0
 import QtQuick.Controls 2.0
 import QtQuick.Controls.Material 2.0
+import QtQuick.Controls.Styles 1.4
 import QtMultimedia 5.5
 import Qt.labs.settings 1.0
 import Qt3D.Core 2.0
@@ -11,7 +12,6 @@ import "qrc:/thymio-ar"
 //import "qrc:/thymio-vpl2" as VPL2
 import QtSensors 5.0
 
-import ExperimentFilter 1.0
 import MarkerModel 1.0
 
 import Qt3D.Extras 2.0
@@ -48,101 +48,28 @@ ApplicationWindow {
 			}
 
 			Item {
-				 Layout.fillWidth: true
+                 Layout.fillWidth: true
 			}
 
-            // Button to start and stop the monitoring. For more information check markermodel.cpp
-            ToolButton {
-                property bool active: false
-                id: monitoringToggle
-                contentItem: Image {
-                    anchors.centerIn:  parent
-                    source: monitoringToggle.active ? "icons/ic_monitoring_on_24px.svg"
-                                                          : "icons/ic_monitoring_off_24px.svg"
-                }
-                onClicked: {
-                    active = !active
-                    active ? markermodel.startMonitoring() : markermodel.stopMonitoring()
-                }
+            CheckBox {
+                id: checkboxUseTransMem
+                width: 300
+                text: "Use TransMem"
+                scale: 0.5
+                font.bold: true
+                font.pointSize: 30
+                checked: true
             }
 
-            // Button to activate and deactivate the experiment filter.
-            ToolButton {
-                property bool active: false
-                id: experimentFilterToggle
-                contentItem: Image {
-                    anchors.centerIn:  parent
-                    source: experimentFilterToggle.active ? "icons/ic_experiment_filter_on_24px.svg"
-                                                          : "icons/ic_experiment_filter_off_24px.svg"
-                }
-                onClicked: active = !active
-            }
-
-            // Button to hide and unhide the lower left part of the image.
-            ToolButton {
-                property bool active: false
-                id: hideLowerLeftToggle
-                contentItem:  Image {
-                    anchors.centerIn:  parent
-                    source : hideLowerLeftToggle.active ? "icons/ic_hide_lower_left_on_24px.svg"
-                                                        : "icons/ic_hide_lower_left_off_24px.svg"
-                }
-                onClicked: {
-                    active = !active
-                    experimentFilter.setHideFlag(2, active)
-                }
-            }
-
-            // Button to hide and unhide the upper left part of the image.
-            ToolButton {
-                property bool active: false
-                id: hideUpperLeftToggle
-                contentItem:  Image {
-                    anchors.centerIn:  parent
-                    source : hideUpperLeftToggle.active ? "icons/ic_hide_upper_left_on_24px.svg"
-                                                        : "icons/ic_hide_upper_left_off_24px.svg"
-                }
-                onClicked: {
-                    active = !active
-                    experimentFilter.setHideFlag(0, active)
-                }
-            }
-
-            // Button to hide and unhide the upper right part of the image.
-            ToolButton {
-                property bool active: false
-                id: hideUpperRightToggle
-                contentItem:  Image {
-                    anchors.centerIn:  parent
-                    source : hideUpperRightToggle.active ? "icons/ic_hide_upper_right_on_24px.svg"
-                                                        : "icons/ic_hide_upper_right_off_24px.svg"
-                }
-                onClicked: {
-                    active = !active
-                    experimentFilter.setHideFlag(1, active)
-                }
-            }
-
-            // Button to hide and unhide the lower right part of the image.
-            ToolButton {
-                property bool active: false
-                id: hideLowerRightToggle
-                contentItem:  Image {
-                    anchors.centerIn:  parent
-                    source : hideLowerRightToggle.active ? "icons/ic_hide_lower_right_on_24px.svg"
-                                                        : "icons/ic_hide_lower_right_off_24px.svg"
-                }
-                onClicked: {
-                    active = !active
-                    experimentFilter.setHideFlag(3, active)
-                }
-            }
-
-            // Slider to control the noise magnitude of the experiment filter.
-            Slider {
-                id: saltyNoiseSlider
-                onValueChanged: experimentFilter.setNoiseMagnitude(value)
-
+            CheckBox {
+                id: checkboxShowProtagonist
+                x: 400
+                width: 50
+                text: "Show protagonist"
+                scale: 0.5
+                font.bold: true
+                font.pointSize: 30
+                checked: true
             }
 
 			ToolButton {
@@ -165,14 +92,12 @@ ApplicationWindow {
         captureMode: Camera.CaptureViewfinder
 		cameraState: Camera.LoadedState
 
+        // Uncomment the following statement to use a second camera on a laptop (not the internal one)
         //deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
 	}
 
-
-
-
-
-    // HACK
+    // On some devices there occurs a "CameraBin error: Internal data flow error." when using am usb camera.
+    // Using this hack restarts the camera after the error occured and bypasses the problem.
     Timer {
         running: true
         interval: 3000
@@ -182,38 +107,12 @@ ApplicationWindow {
         }
     }
 
-
-    // Timer to update model.
+    // Timer to update the marker model.
     Timer {
         running: true
         interval: 20
-        onTriggered: { markermodel.updateModel();
-        sphereTransform.userTrans = ((sphereTransform.userTrans + 1)%20);}
+        onTriggered: markermodel.updateModel();
         repeat: true
-    }
-
-
-    //
-    Transform {
-        id: sphereTransform
-        property real userAngle: 0.0
-        property real userTrans: 0.0
-        matrix: {
-            var m = Qt.matrix4x4();
-            m.rotate(userAngle, Qt.vector3d(0, 0, 1));
-            m.translate(Qt.vector3d(1/userTrans, 0, 0));
-            m.scale(Qt.vector3d(2,2,2));
-            return m;
-        }
-    }
-
-    SphereMesh {
-        id: sphereMesh
-        radius: 0.3
-    }
-
-    PhongMaterial {
-        id: material
     }
 
 	Vision {
@@ -248,7 +147,7 @@ ApplicationWindow {
 		anchors.fill: parent
         //focus : visible
 		source: camera
-        filters: [experimentFilter, vision]
+        filters: [vision]
 		fillMode: VideoOutput.PreserveAspectCrop
 		onContentRectChanged: cameraRect = mapNormalizedRectToItem(Qt.rect(0, 0, 1, 1));
 	}
@@ -267,14 +166,8 @@ ApplicationWindow {
         worldCenterMarker: worldCenterLandmark
         worldCenterRelativeMarkers: [orangeHouseLandmark, adaHouseLandmark]
 
-        // model specific parameter
-
-
-    }
-
-    ExperimentFilter {
-        id: experimentFilter
-        active: experimentFilterToggle.active
+        // Model specific parameter:
+        useTransMem: checkboxUseTransMem.checked
     }
 
 	Scene3d {
@@ -286,19 +179,19 @@ ApplicationWindow {
         Entity {
            OrangeHouse {
                 id: orangeHouse
-                t: orangeHouseLandmark.relativePose
+                poseRelativeToWorldCenter: orangeHouseLandmark.relativePose
                 enabled: orangeHouseLandmark.visible
             }
 
            AdaHouse {
                id: adaHouse
-               t: adaHouseLandmark.relativePose
+               poseRelativeToWorldCenter: adaHouseLandmark.relativePose
                enabled: adaHouseLandmark.visible
            }
 
+           // Very simplistic illustration of an "protagonist" walking through the scene.
            Protagonist {
-                id: protagonist
-                enabled: false
+                enabled: (worldCenterLandmark.visible || orangeHouseLandmark.visible || adaHouseLandmark.visible) && checkboxShowProtagonist.checked
            }
         }
 
@@ -319,7 +212,7 @@ ApplicationWindow {
 		opacity: 0.5
 
 		transform: [
-			Scale {
+            Scale {
 				xScale: 1 / cameraRect.height
 				yScale: 1 / cameraRect.height
 			},

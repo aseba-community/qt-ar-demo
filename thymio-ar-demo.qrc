@@ -8,25 +8,13 @@
         <file>OrangeHouse.qml</file>
         <file>assets/markers/orangehouse_tracker.png</file>
         <file>assets/markers/orangehouse.xml</file>
-        <file>icons/ic_filter_center_focus_black_24px.svg</file>
         <file>assets/markers/adahouse.xml</file>
         <file>assets/markers/adahouse_tracker.png</file>
         <file>AdaHouse.qml</file>
         <file>assets/markers/bluehouse.xml</file>
         <file>assets/markers/bluehouse_tracker.png</file>
         <file>BlueHouse.qml</file>
-        <file>icons/ic_hide_lower_left_off_24px.svg</file>
-        <file>icons/ic_hide_lower_left_on_24px.svg</file>
-        <file>icons/ic_hide_lower_right_off_24px.svg</file>
-        <file>icons/ic_hide_lower_right_on_24px.svg</file>
-        <file>icons/ic_hide_upper_left_off_24px.svg</file>
-        <file>icons/ic_hide_upper_left_on_24px.svg</file>
-        <file>icons/ic_hide_upper_right_off_24px.svg</file>
-        <file>icons/ic_hide_upper_right_on_24px.svg</file>
-        <file>icons/ic_experiment_filter_on_24px.svg</file>
-        <file>icons/ic_experiment_filter_off_24px.svg</file>
-        <file>icons/ic_monitoring_off_24px.svg</file>
-        <file>icons/ic_monitoring_on_24px.svg</file>
         <file>Protagonist.qml</file>
+        <file>icons/ic_filter_center_focus_black_24px.svg</file>
     </qresource>
 </RCC>

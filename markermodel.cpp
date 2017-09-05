@@ -1,9 +1,5 @@
 #include "markermodel.h"
 
-//#define RUN_WITHOUT_TRANSMEM
-
-// Helper functions
-
 // Creates the transformation matrix from a rotation quaternion and a translation vector
 QMatrix4x4 rotAndTransPair2Matrix(const rotAndTransPair &qp){
 
@@ -17,9 +13,9 @@ QMatrix4x4 rotAndTransPair2Matrix(const rotAndTransPair &qp){
 rotAndTransPair matrix2rotAndTransPair(const QMatrix4x4 &m){
 
     float data[]{ m(0,0),m(0,1),m(0,2),
-                  m(1,0),m(1,1),m(1,2),
-                  m(2,0),m(2,1),m(2,2)
-                };
+                m(1,0),m(1,1),m(1,2),
+                m(2,0),m(2,1),m(2,2)
+    };
 
     QMatrix3x3 rM(data);
 
@@ -35,7 +31,7 @@ QVector4D compareRotAndTransPair(const rotAndTransPair &qp1, const rotAndTransPa
     // We first split each transformation in a translation vector vTra,
     // a rotation axis vRotA and an angle fAngl.
     QVector3D vTra1 = qp1.second,
-              vTra2 = qp2.second;
+            vTra2 = qp2.second;
 
     QVector3D vRotA1, vRotA2; float fAngl1, fAngl2;
 
@@ -83,12 +79,12 @@ QVector4D compareRotAndTransPair(const rotAndTransPair &qp1, const rotAndTransPa
 
     // Return a vector encoding the "difference" between two transformations.
     // For equal transformation the method returns QVector4D(0,0,0,0).
-                        //x             //y                 //z                     //w
+    //x             //y                 //z                     //w
     return QVector4D(   ratioLenT,     distanceNormalT,    distanceNormalPointR,   distRotAxesZ);
 
 }
 
-// Average two quaternions and normalized them afterwards
+// Average two quaternions componentwise and normalized them afterwards
 QQuaternion avgAndNormalizeQuaternions(const QQuaternion &q1, const QQuaternion &q2){
 
     QQuaternion ret = QQuaternion( (q1.scalar() + q2.scalar()) / 2.,
@@ -109,7 +105,7 @@ QVector3D avgVector3D(const QVector3D &v1, const QVector3D &v2){
     return ret;
 }
 
-// Decides if two transformations are equal or not
+// Decides if two transformations are "equal" or not
 bool equalTransformation(const rotAndTransPair &qp1, const rotAndTransPair &qp2){
 
     // Parameter to decide if to transforamtion are equal.              ratioLenT   distanceNormalT  distanceNormalPointR  distanceNormalR
@@ -118,15 +114,13 @@ bool equalTransformation(const rotAndTransPair &qp1, const rotAndTransPair &qp2)
     QVector4D diff = compareRotAndTransPair(qp1, qp2);
 
     return diff.x() < thTransformationEquality.x() && diff.y() < thTransformationEquality.y() &&
-           diff.z() < thTransformationEquality.z() && diff.w() < thTransformationEquality.w();
+            diff.z() < thTransformationEquality.z() && diff.w() < thTransformationEquality.w();
 }
 
-// Constructor
-
+// Constructor  for the marker model, just need to specify it when we use the monitoring functionality.
+#ifdef USE_MONITORING_FUNCTIONALITY
 MarkerModel::MarkerModel(){
 
-   // Monitoring functionality
-   {
     // Necessary to allow connections to marker model monitor
     qRegisterMetaType<Timestamp>(); qRegisterMetaType<rotAndTransPair>(); qRegisterMetaType<std::string>();
 
@@ -144,11 +138,10 @@ MarkerModel::MarkerModel(){
     connect(this, &MarkerModel::registerTransformationToMonitor, monitor, &MarkerModelMonitor::registerTransformationToMonitor);
 
     monitorThread.start();
-    }
 }
+#endif
 
 /* STWC = StampedTransformationWithConfidence) */
-
 // Multiplies two STWC objects
 StampedTransformationWithConfidence MarkerModel::multiplySTWC(const StampedTransformationWithConfidence &lhs, const StampedTransformationWithConfidence &rhs){
 
@@ -188,17 +181,17 @@ StampedTransformationWithConfidence MarkerModel::averageSTWCifEqual(StampedTrans
 StampedTransformationWithConfidence MarkerModel::invertSTCW(StampedTransformationWithConfidence &lhs){
 
     lhs.rotation = lhs.rotation.inverted();
-    lhs.translation = -(lhs.rotation*lhs.translation); /* *lhs.rotation.conjugated())*/
+    lhs.translation = -(lhs.rotation*lhs.translation);
 
     return lhs;
 }
-
 
 // Slot gets called whenever the pose of a marker determined by the tracker was updated
 void MarkerModel::markerPositionUpdated(){
 
     Timestamp tsNow = std::chrono::high_resolution_clock::now();
 
+    // Determine which landmark was the sender of the signal
     QObject *sender = QObject::sender();
     Landmark *senderLandmark = qobject_cast<Landmark*>(sender);
 
@@ -207,26 +200,23 @@ void MarkerModel::markerPositionUpdated(){
     std::string markerID = (senderLandmark->identifier).toStdString();
 
     // If the marker model is ran without transmem we don't store anything in transmem
-    #ifdef RUN_WITHOUT_TRANSMEM
-        emit linkUpdate(markerID, camID, tsNow, matrix2rotAndTransPair(pose), confidence);
-        return;
-    #endif
-
-    #ifndef RUN_WITHOUT_TRANSMEM
-        if(confidence >= thConfidenceMarkerUpdate)
+    if(useTransMem){
+        if(confidence >= thConfUpdate)
             registerLink(markerID, camID, tsNow, pose, confidence);
         else
             try { updateLinkConfidence(markerID, camID, confidence); }
-            catch(NoSuchLinkFoundException e) { /* Quality can just be updated if there was already a successful update. */ }
+        catch(NoSuchLinkFoundException e) { /* Quality can just be updated if there was already a successful update. */ }
+    }
 
-        emit linkUpdate(markerID, camID, tsNow, matrix2rotAndTransPair(pose), confidence);
-    #endif
+#ifdef USE_MONITORING_FUNCTIONALITY
+    emit linkUpdate(markerID, camID, tsNow, matrix2rotAndTransPair(pose), confidence);
+#endif
 }
 
 // Whenever this function is called, the relative transformation for all marker are update with the best information available
 void MarkerModel::updateModel(){
 
-    // Make sure there is a world center marker
+    // Make sure there is a world center marker.
     if(!worldCenterMarker){
         qWarning() << "No world center marker available. Returning.";
         return;
@@ -234,35 +224,29 @@ void MarkerModel::updateModel(){
 
     // At what time do we want to update the model?
     Timestamp tsNow = std::chrono::high_resolution_clock::now();
-
- // Transformation from the world center to the camera
+    // Transformation from the world center to the camera.
     StampedTransformationWithConfidence world2camNow;
 
-
-    {
-    #ifdef RUN_WITHOUT_TRANSMEM
+    if(useTransMem){
+        try{ world2camNow = getLink(worldID, camID, tsNow); }
+        catch(NoSuchLinkFoundException){ /* world center marker not seen yet. */ }
+    }
+    else{
         rotAndTransPair rotAndTrans = matrix2rotAndTransPair(worldCenterMarker->pose());
         world2camNow.rotation = rotAndTrans.first;
         world2camNow.translation = rotAndTrans.second;
         world2camNow.averageLinkConfidence = worldCenterMarker->confidence();
         world2camNow.maxDistanceToEntry = 0.;
-    #endif
     }
 
-    #ifndef RUN_WITHOUT_TRANSMEM
-        try{ world2camNow = getLink(worldID, camID, tsNow); }
-        catch(NoSuchLinkFoundException){ /* world center marker not seen yet. */ }
-    #endif
-
-    // The world center marker is not visible if the confidence is to bad
-    worldCenterMarker->visible = !(world2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
-
-    if(world2camNow.maxDistanceToEntry > thDistanceToLastUpdate)
+    // The world center marker is not visible if the confidence is to bad.
+    worldCenterMarker->visible = !(world2camNow.averageLinkConfidence < thConfVisible);
+    // The world center marker is also not visible if the last update happened too long ago.
+    if(world2camNow.maxDistanceToEntry > thLastUpdate)
         worldCenterMarker->visible = false;
     emit worldCenterMarker->visibilityUpdated();
 
     unsigned int numberOfRelativeMarker = relativeMarkers.count();
-
     // If no additional marker are available, we can't do that much..
     if(numberOfRelativeMarker < 1){
 
@@ -270,13 +254,85 @@ void MarkerModel::updateModel(){
 
         emit worldCenterMarker->relativePoseUpdated();
         emit worldCenterMarker->visibilityUpdated();
+
         return;
     }
 
+    if(useTransMem){
+        // Storage for all relative marker which can be updated.
+        QVector<Landmark*> updatableMarker = QVector<Landmark*>();
+        // Storage for all transformations mapping from a relative marker to the camera.
+        QVector<StampedTransformationWithConfidence>  cam2relativeMarkersNow = QVector<StampedTransformationWithConfidence>();
+        // Storage for all best transformations mapping from the world center to a relative marker.
+        QVector<StampedTransformationWithConfidence> world2relativeMarkersFix = QVector<StampedTransformationWithConfidence>();
 
-    {
-    // We asume the last update of the pose happened right at the moment when we update the model
-    #ifdef RUN_WITHOUT_TRANSMEM
+        StampedTransformationWithConfidence relativeMarker2camNow, world2relativeMarkerFix, world2camOption;
+        std::string markerID;
+        // First check for every marker but the world center marker if it is visible.
+        for(Landmark* relativeMarker : relativeMarkers){
+
+            // Just make sure we dont run into a null pointer here.
+            if(relativeMarker == nullptr)
+                continue;
+
+            markerID = (relativeMarker->identifier).toStdString();
+
+            try{ relativeMarker2camNow = getLink(markerID, camID, tsNow); }
+            catch(NoSuchLinkFoundException){
+                continue; /* no link registered yet */ }
+
+            try{ world2relativeMarkerFix = getBestLink(worldID, markerID); }
+            catch(NoSuchLinkFoundException){ continue; /* no link registered yet */ }
+
+            // If the current confidence is to low we assume the marker is not visible.
+            relativeMarker->visible = !(relativeMarker2camNow.averageLinkConfidence < thConfVisible);
+
+            // We just consider the marker for further calculations if there was recently was an update
+            // and the fix transformation is also good enough, otherwise we set it to invisible
+            if( relativeMarker2camNow.maxDistanceToEntry > thLastUpdate ||
+                    world2relativeMarkerFix.maxDistanceToEntry > thFixUpdate) {
+
+                relativeMarker->visible = false;
+                relativeMarker->visibilityUpdated();
+                continue;
+            }
+
+            // Calculate optional mapping from world to cam
+            world2camOption = multiplySTWC(relativeMarker2camNow, world2relativeMarkerFix);
+
+            if(world2camNow.maxDistanceToEntry > thLastUpdate)
+                world2camNow = world2camOption;
+            else
+                // Average the mappings to reduce scatter?
+                world2camNow = averageSTWCifEqual(world2camNow, world2camOption);
+
+            updatableMarker.push_back(relativeMarker);
+            cam2relativeMarkersNow.push_back(invertSTCW(relativeMarker2camNow));
+            world2relativeMarkersFix.push_back(world2relativeMarkerFix);
+
+        }
+
+        StampedTransformationWithConfidence cam2relativeMarkerNow, world2relativeMarkerNow;
+        // The transformation for every marker but the world center marker which is visible can be updated.
+        for(int indx = 0; indx < updatableMarker.count(); indx++){
+
+            Landmark* updatedMarker = updatableMarker.at(indx);
+
+            cam2relativeMarkerNow = cam2relativeMarkersNow.at(indx);
+            world2relativeMarkerFix = world2relativeMarkersFix.at(indx);
+
+            world2relativeMarkerNow = multiplySTWC(cam2relativeMarkerNow, world2camNow);
+            world2relativeMarkerNow = averageSTWCifEqual(world2relativeMarkerNow, world2relativeMarkerFix);
+
+            updatedMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2relativeMarkerNow.rotation, world2relativeMarkerNow.translation});
+
+            emit updatedMarker->relativePoseUpdated();
+            emit updatedMarker->visibilityUpdated();
+        }
+    }
+    // Without the use of TransMem.
+    else {
+
         StampedTransformationWithConfidence relativeMarker2camNow;
         for(Landmark* relativeMarker : relativeMarkers){
 
@@ -286,7 +342,7 @@ void MarkerModel::updateModel(){
             relativeMarker2camNow.averageLinkConfidence = relativeMarker->confidence();
             relativeMarker2camNow.maxDistanceToEntry = 0.;
 
-            relativeMarker->visible = !(relativeMarker2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
+            relativeMarker->visible = !(relativeMarker2camNow.averageLinkConfidence < thConfVisible);
 
             StampedTransformationWithConfidence world2relativeMarkerNow = multiplySTWC(invertSTCW(relativeMarker2camNow), world2camNow);
             relativeMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2relativeMarkerNow.rotation, world2relativeMarkerNow.translation});
@@ -294,116 +350,32 @@ void MarkerModel::updateModel(){
             emit relativeMarker->relativePoseUpdated();
             emit relativeMarker->visibilityUpdated();
         }
-    #endif
     }
 
-    #ifndef RUN_WITHOUT_TRANSMEM
-    // Storage for all relative marker which can be updated
-    QVector<Landmark*> updatableMarker = QVector<Landmark*>();
-
-    // Storage for all transformations mapping from a relative marker to the camera
-    QVector<StampedTransformationWithConfidence>  cam2relativeMarkersNow = QVector<StampedTransformationWithConfidence>();
-
-    // Storage for all best transformations mapping from the world center to a relative marker
-    QVector<StampedTransformationWithConfidence> world2relativeMarkersFix = QVector<StampedTransformationWithConfidence>();
-
-    StampedTransformationWithConfidence relativeMarker2camNow, world2relativeMarkerFix, world2camOption;
-    std::string markerID;
-    for(Landmark* relativeMarker : relativeMarkers){
-
-        // just make sure we dont run into a null pointer here
-        if(relativeMarker == nullptr)
-            continue;
-
-        markerID = (relativeMarker->identifier).toStdString();
-
-        // If the marker model is ran without transmem, we just dont have any information
-        // but the one that currently stored in any marker. So the only thing we can do is to
-        // calculate the position of the marker relative to the world center at the moment of the
-        // update.
-
-        try{ relativeMarker2camNow = getLink(markerID, camID, tsNow); }
-        catch(NoSuchLinkFoundException){ continue; /* no link registered yet */ }
-
-        try{ world2relativeMarkerFix = getBestLink(worldID, markerID); }
-        catch(NoSuchLinkFoundException){ continue; /* no link registered yet */ }
-
-        // if the current confidence is to low we assume the marker is not visible
-        relativeMarker->visible = !(relativeMarker2camNow.averageLinkConfidence < thConfidenceMarkerVisible);
-
-        // We just consider the marker for further calculations if there was recently was an update
-        // and the fix transformation is also good enough, otherwise we set it to invisible
-        if( relativeMarker2camNow.maxDistanceToEntry > thDistanceToLastUpdate ||
-            world2relativeMarkerFix.maxDistanceToEntry > thDistanceGoodFix) {
-
-            relativeMarker->visible = false;
-            relativeMarker->visibilityUpdated();
-            continue;
-        }
-
-        // Calculate optional mapping from world to cam
-        world2camOption = multiplySTWC(relativeMarker2camNow, world2relativeMarkerFix);
-
-        if(world2camNow.maxDistanceToEntry > thDistanceToLastUpdate)
-            world2camNow = world2camOption;
-        else
-            // Average the mappings to reduce jitter?
-            world2camNow = averageSTWCifEqual(world2camNow, world2camOption);
-
-        updatableMarker.push_back(relativeMarker);
-        cam2relativeMarkersNow.push_back(invertSTCW(relativeMarker2camNow));
-        world2relativeMarkersFix.push_back(world2relativeMarkerFix);
-
-      }
-
-    //
-    StampedTransformationWithConfidence cam2relativeMarkerNow, world2relativeMarkerNow;
-    for(int indx = 0; indx < updatableMarker.count(); indx++){
-
-        Landmark* updatedMarker = updatableMarker.at(indx);
-
-        cam2relativeMarkerNow = cam2relativeMarkersNow.at(indx);
-        world2relativeMarkerFix = world2relativeMarkersFix.at(indx);
-
-        world2relativeMarkerNow = multiplySTWC(cam2relativeMarkerNow, world2camNow);
-
-        world2relativeMarkerNow = averageSTWCifEqual(world2relativeMarkerNow, world2relativeMarkerFix);
-
-        updatedMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2relativeMarkerNow.rotation, world2relativeMarkerNow.translation});
-
-        emit updatedMarker->relativePoseUpdated();
-        emit updatedMarker->visibilityUpdated();
-    }
-    #endif
-
+    // Update the position of the world center marker.
     worldCenterMarker->relativePose = rotAndTransPair2Matrix(rotAndTransPair{world2camNow.rotation, world2camNow.translation});
     emit worldCenterMarker->relativePoseUpdated();
 
-    // Monitoring functionality
-    // Tell the monitor about the updated world to cam transformation.
+    #ifdef USE_MONITORING_FUNCTIONALITY
     emit transformationUpdate("world2cam", tsNow, worldCenterMarker->relativePose, world2camNow.averageLinkConfidence, world2camNow.maxDistanceToEntry);
-
+    #endif
 }
 
 // Monitoring functions for the qml interface
-
+#ifdef USE_MONITORING_FUNCTIONALITY
 void MarkerModel::startMonitoring(){
 
-    /*
     for(Landmark* l : relativeMarkers){
          emit registerLinkUpdateToMonitor(l->identifier.toStdString(), camID);
     }
-    */
-    emit registerLinkUpdateToMonitor(worldCenterMarker->identifier.toStdString(), camID);
 
-    //registerTransformationToMonitor("world2cam");
     emit startMonitor();
 }
 
 void MarkerModel::stopMonitoring(){
-    qDebug() << avgCounter;
     emit stopMonitor();
 }
+#endif
 
 // Set the world center marker and establish connection to get position updates
 void MarkerModel::setWorldCenterMarker( Landmark* worldCenterMarker) {
@@ -421,10 +393,10 @@ Landmark* MarkerModel::getWorldCenterMarker() { return worldCenterMarker; }
 
 QQmlListProperty<Landmark> MarkerModel::worldCenterRelativeMarkers(){
     return QQmlListProperty<Landmark>(this, this,
-             &MarkerModel::appendWorldCenterRelativeMarker,
-             &MarkerModel::worldCenterRelativeMarkersCount,
-             &MarkerModel::worldCenterRelativeMarker,
-             &MarkerModel::clearWorldCenterRelativeMarkers);
+                                      &MarkerModel::appendWorldCenterRelativeMarker,
+                                      &MarkerModel::worldCenterRelativeMarkersCount,
+                                      &MarkerModel::worldCenterRelativeMarker,
+                                      &MarkerModel::clearWorldCenterRelativeMarkers);
 }
 
 void MarkerModel::appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeMarker) {
@@ -434,13 +406,11 @@ void MarkerModel::appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeM
     relativeMarkers.append(worldCenterRelativeMarker);
 }
 
-int MarkerModel::worldCenterRelativeMarkersCount() const
-{
+int MarkerModel::worldCenterRelativeMarkersCount() const {
     return relativeMarkers.count();
 }
 
-Landmark* MarkerModel::worldCenterRelativeMarker(int i) const
-{
+Landmark* MarkerModel::worldCenterRelativeMarker(int i) const {
     return relativeMarkers.at(i);
 }
 
@@ -465,7 +435,7 @@ int MarkerModel::worldCenterRelativeMarkersCount(QQmlListProperty<Landmark>* lis
 }
 
 // Functions for monitoring
-
+#ifdef USE_MONITORING_FUNCTIONALITY
 void MarkerModelMonitor::registerLinkUpdateToMonitor(const std::string &srcFrame, const std::string &destFrame){
 
     std::string linkID = srcFrame+destFrame;
@@ -482,20 +452,20 @@ void MarkerModelMonitor::registerLinkUpdateToMonitor(const std::string &srcFrame
 void MarkerModelMonitor::monitorLinkUpdate(const std::string &srcFrame, const std::string &destFrame, const Timestamp &ts,
                                            const rotAndTransPair &transf, const float &conf) {
 
-   if(!currentlyMonitoring)
-       return;
+    if(!currentlyMonitoring)
+        return;
 
-  std::string linkID = srcFrame+destFrame;
+    std::string linkID = srcFrame+destFrame;
 
-  // Check if link is monitored.
-  auto iter2monitoredLinkUpdates = monitoredLinkUpdates.find(linkID);
-  if(iter2monitoredLinkUpdates == monitoredLinkUpdates.end())
-      return;                 // Link is not monitored.
+    // Check if link is monitored.
+    auto iter2monitoredLinkUpdates = monitoredLinkUpdates.find(linkID);
+    if(iter2monitoredLinkUpdates == monitoredLinkUpdates.end())
+        return;                 // Link is not monitored.
 
-  // Add entry raw to the corresponding container.
+    // Add entry raw to the corresponding container.
     std::list<LinkUpdate> &refToUpdates = ((*iter2monitoredLinkUpdates).second);
-  if(refToUpdates.size() < MAX_NUMBER_OF_MONITORED_UPDATES_PER_LINK)
-      refToUpdates.push_back(LinkUpdate{ts, transf, conf});
+    if(refToUpdates.size() < MAX_NUMBER_OF_MONITORED_UPDATES_PER_LINK)
+        refToUpdates.push_back(LinkUpdate{ts, transf, conf});
 }
 
 void MarkerModelMonitor::registerTransformationToMonitor(const std::string &transID){
@@ -523,7 +493,7 @@ void MarkerModelMonitor::monitorTransformationUpdate(const std::string &transID,
 
 void MarkerModelMonitor::startMonitoring() {
 
-   if(currentlyMonitoring)
+    if(currentlyMonitoring)
         return;         // Already monitoring.
 
     monitoringStartedAt = std::chrono::high_resolution_clock::now();
@@ -634,7 +604,7 @@ void MarkerModelMonitor::writeSingleLinkUpdateRecordToFile(std::list<LinkUpdate>
                 << lu.srcFrame                                          << lineSeperator
                 << lu.dstFrame;
         }
-            out << newLine;
+        out << newLine;
 
     }
 
@@ -668,8 +638,6 @@ void MarkerModelMonitor::writeSingleTransforamtionUpdateRecordToFile(std::list<T
             << QString::number((tu.transformation.second.y()))      << lineSeperator
             << QString::number(tu.transformation.second.z())        << newLine;
 
-            //<< QString::number(tu.avgerageLinkConfidence)           << lineSeperator
-            //<< QString::number(tu.maxDistanceToEntry)               << newLine;
     }
 
     file.close();
@@ -678,3 +646,4 @@ void MarkerModelMonitor::writeSingleTransforamtionUpdateRecordToFile(std::list<T
         return;
     }
 }
+#endif

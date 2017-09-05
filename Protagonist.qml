@@ -3,24 +3,23 @@ import Qt3D.Render 2.0
 import Qt3D.Extras 2.0
 import QtQuick 2.7
 
+// Very simple object to illustrate a protagonist.
 Entity {
-    id: root
-    components: [transform, mesh, material]
+
+    components: [protagonistTransformation, protagonistMesh, protagonistMaterial]
 
     PhongMaterial {
-        id: material
+        id: protagonistMaterial
         ambient: 'darkred'
     }
 
-    Timer {
-        running: true
-        interval: 20
-        onTriggered: transform.angle = (transform.angle + 1) % 360;
-        repeat: true
+    SphereMesh {
+        id: protagonistMesh
+        radius: 0.05
     }
 
     Transform {
-        id: transform
+        id: protagonistTransformation
         property var angle : 0.0
         matrix: {
                var m = Qt.matrix4x4();
@@ -28,12 +27,13 @@ Entity {
                m.translate(Qt.vector3d(0.25, 0, 0));
                return m;
            }
-    }
 
-    CuboidMesh {
-        id: mesh
-        xExtent: 0.1
-        yExtent: 0.1
-        zExtent: 0.1
+        // Updates the position of the protagonist.
+        Timer {
+            running: true
+            interval: 20
+            onTriggered: parent.angle = (parent.angle + 1) % 360;
+            repeat: true
+        }
     }
 }

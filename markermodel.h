@@ -20,33 +20,18 @@
 
 typedef std::pair<QQuaternion, QVector3D> rotAndTransPair;
 
+// Comment this out to make use of the monitoring functionality of the marker model.
+// Allows to write transformation updates received from the tracker as well as transformations
+// of the output to files.
+//#define USE_MONITORING_FUNCTIONALITY
+
 Q_DECLARE_METATYPE(Timestamp)
 Q_DECLARE_METATYPE(rotAndTransPair)
 Q_DECLARE_METATYPE(std::string)
 
-/************************************
- * PARAMETER FOR THE MODEL          *
- ************************************/
-
-//TODO: setable through qml interface
-
-// A marker is considered to be visible if the confidence is greater than this threshold.
-const double thConfidenceMarkerVisible = 0.45;
-
-// Transmem is updated if the confidence of a marker is greater than this threshold.
-const double thConfidenceMarkerUpdate = 0.45;
-
-// A transformation is considered to be good enough if updated in a time smaller than this threshold.
-const double thDistanceToLastUpdate = 100;       // in ms
-
-// A fix transformation is considered to be  good all updates are within this time
-const double thDistanceGoodFix = 250;
-
+#ifdef USE_MONITORING_FUNCTIONALITY
 class MarkerModelMonitor;
-
-/*****************************
- * MARKER MODEL              *
- *****************************/
+#endif
 
 class MarkerModel : public QObject, public TransMem {
 
@@ -54,36 +39,54 @@ class MarkerModel : public QObject, public TransMem {
 
 public:
 
+    // Destructor, just need to specify it explictly when we use the monitoring functionality.
+    #ifdef USE_MONITORING_FUNCTIONALITY
     MarkerModel();
 
-    // Destructor
     ~MarkerModel(){
-
         stopMonitoring();
-
         monitorThread.quit();
         monitorThread.wait();
     }
+    #endif
 
     // QML Interface for the marker model
     Q_PROPERTY(Landmark* worldCenterMarker READ getWorldCenterMarker WRITE setWorldCenterMarker)
-
     Q_PROPERTY(QQmlListProperty<Landmark> worldCenterRelativeMarkers READ worldCenterRelativeMarkers)
 
-    Q_INVOKABLE void updateModel();
+    Q_PROPERTY(double thConfVisible READ getThConfVisible WRITE setThConfVisible)
+    Q_PROPERTY(double thConfUpdate READ getThConfUpdate WRITE setThConfUpdate)
+    Q_PROPERTY(double thLastUpdate READ getThLastUpdate WRITE setThLastUpdate)
+    Q_PROPERTY(double thFixUpdate READ getThFixUpdate WRITE setThFixUpdate)
 
+    Q_PROPERTY(bool useTransMem READ getUseTransMem WRITE setUseTransMem)
+
+    #ifdef USE_MONITORING_FUNCTIONALITY
     // QML Interface for the monitoring
     Q_INVOKABLE void startMonitoring();
     Q_INVOKABLE void stopMonitoring();
+    #endif
 
-    // Functions needed for the QML interface
+    Q_INVOKABLE void updateModel();
+
+    // Functions needed for the QML interface    
     QQmlListProperty<Landmark> worldCenterRelativeMarkers();
     void appendWorldCenterRelativeMarker(Landmark* worldCenterRelativeMarker);
     int worldCenterRelativeMarkersCount() const;
     Landmark* worldCenterRelativeMarker(int i) const;
     void clearWorldCenterRelativeMarkers();
 
-    int avgCounter{0};
+    // Threshold for the visibility. If the current confidence of a marker is below this threshold then the marker is set to be not visible.
+    double thConfVisible{0.4};   double getThConfVisible(){ return thConfVisible; }     void setThConfVisible(double th){ thConfVisible = th; }
+    // Threshold for the an update. If the current confidence of a marker is above this threshold then the marker transformation is stored in TransMem.
+    double thConfUpdate{0.45};   double getThConfUpdate(){ return thConfUpdate; }       void setThConfUpdate(double th){ thConfUpdate = th; }
+    // If TransMem was updated within the time specified by this threshold then the marker is visible.
+    double thLastUpdate{100};    double getThLastUpdate(){ return thLastUpdate; }       void setThLastUpdate(double th){ thLastUpdate = th; }
+    // If two markers are seen together within the time specified through this threshold then the fix transformation between these two markers is updated.
+    double thFixUpdate{250};     double getThFixUpdate(){ return thFixUpdate; }         void setThFixUpdate(double th){ thFixUpdate = th; }
+
+    // Determines whether TransMem is used or not. Implemented mainly for presenting.
+    bool useTransMem{true};      bool getUseTransMem(){ return useTransMem; }           void setUseTransMem(bool b) { useTransMem = b; }
 
 public slots:
 
@@ -107,22 +110,22 @@ private:
     std::string worldID;
 
     // Functions needed for the qml interface
-
     void setWorldCenterMarker( Landmark* worldCenterMarker);
     Landmark* getWorldCenterMarker();
-
 
     static void appendWorldCenterRelativeMarker(QQmlListProperty<Landmark>*, Landmark*);
     static int worldCenterRelativeMarkersCount(QQmlListProperty<Landmark>*);
     static Landmark* worldCenterRelativeMarker(QQmlListProperty<Landmark>*, int);
     static void clearWorldCenterRelativeMarkers(QQmlListProperty<Landmark>*);
 
+    #ifdef USE_MONITORING_FUNCTIONALITY
     // Thread which runs the monitoring.
     QThread monitorThread;
+    #endif
 
+// Signals used for the monitoring.
+#ifdef USE_MONITORING_FUNCTIONALITY
 signals:
-
-    // Signals for the monitor.
 
     // Object emits this signal everytime it received an update for a tranformation through
     // updateLinkNow(..) from the QML model to inform the monitor also about the update.
@@ -138,9 +141,11 @@ signals:
 
     void startMonitor();
     void stopMonitor();
-
+#endif
 };
 
+// Container used to store monitored transformations.
+#ifdef USE_MONITORING_FUNCTIONALITY
 // Stores a single update of a link direct from the tracker.
 struct LinkUpdate {
     Timestamp time;
@@ -162,7 +167,10 @@ struct TransformationUpdate  {
     double timeSinceFirstRecordedUpdate;
     QString transformationID;
 };
+#endif
 
+// Implementation of the MarkerModelMonitor class. This class implements the monitoring.
+#ifdef USE_MONITORING_FUNCTIONALITY
 class MarkerModelMonitor : public QObject{
 
     Q_OBJECT
@@ -183,8 +191,6 @@ public slots:
 
 protected:
 
-
-
     // Container for the monitored link updates.
     std::unordered_map<std::string, std::list<LinkUpdate> > monitoredLinkUpdates;
     std::unordered_map<std::string, std::pair<std::string, std::string> > monitoredLinkIdentifier;
@@ -196,9 +202,9 @@ protected:
     const unsigned int MAX_NUMBER_OF_MONITORED_UPDATES_PER_LINK = 1000000;
     const unsigned int MAX_NUMBER_OF_MONITORED_UPDATES_PER_TRANFORMATION = 1000000;
 
-    // Were do we want to store the analysis. It would make sense to make this
+    // Were do we want to store the monitored files. It would make sense to make this
     // path setable via a gui in later versions.
-    const QString PATH = "../thymio-ar-demo/analysis/";
+    const QString PATH = "..";
 
     Timestamp monitoringStartedAt;
 
@@ -210,5 +216,6 @@ protected:
     void writeSingleLinkUpdateRecordToFile(std::list<LinkUpdate>& output, const QString &path, bool appenSRCandDST);
     void writeSingleTransforamtionUpdateRecordToFile(std::list<TransformationUpdate>& output, const QString &path);
 };
+#endif
 
 #endif // MARKERMODEL_H
