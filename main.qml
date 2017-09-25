@@ -13,7 +13,6 @@ import "qrc:/thymio-ar"
 import QtSensors 5.0
 
 import MarkerModel 1.0
-
 import Qt3D.Extras 2.0
 
 ApplicationWindow {
@@ -24,32 +23,32 @@ ApplicationWindow {
 	height: 600
 
 	header: ToolBar {
-		RowLayout {
-			anchors.fill: parent
+		    RowLayout {
+		    anchors.fill: parent
 
-			Repeater {
-				model: (camera.cameraStatus === Camera.ActiveStatus && vision) ? vision.landmarks : 0
-				delegate: ToolButton {
+		    Repeater {
+			model: (camera.cameraStatus === Camera.ActiveStatus && vision) ? vision.landmarks : 0
+			delegate: ToolButton {
 					contentItem: Item {
-						Image {
-							source: modelData.icon
-							x: parent.height * 0.1
-							height: parent.height * 0.8
-							width: parent.height * 0.8
-						}
-						ProgressBar {
-							width: parent.width
-							to: 0.5
-							value: modelData.confidence
-							anchors.bottom: parent.bottom
-						}
+					Image {
+					    source: modelData.icon
+					    x: parent.height * 0.1
+					    height: parent.height * 0.8
+					    width: parent.height * 0.8
 					}
-				}
+					ProgressBar {
+					    width: parent.width
+					    to: 0.5
+					    value: modelData.confidence
+					    anchors.bottom: parent.bottom
+					}
+				    }
 			}
+		}
 
-			Item {
+		Item {
                  Layout.fillWidth: true
-			}
+		}
 
             CheckBox {
                 id: checkboxUseTransMem
