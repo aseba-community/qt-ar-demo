@@ -30,37 +30,34 @@ ApplicationWindow {
 			model: (camera.cameraStatus === Camera.ActiveStatus && vision) ? vision.landmarks : 0
 			delegate: ToolButton {
 					contentItem: Item {
-					Image {
-					    source: modelData.icon
-					    x: parent.height * 0.1
-					    height: parent.height * 0.8
-					    width: parent.height * 0.8
-					}
-					ProgressBar {
-					    width: parent.width
-					    to: 0.5
-					    value: modelData.confidence
-					    anchors.bottom: parent.bottom
-					}
-				    }
-			}
-		}
-
-		Item {
-                 Layout.fillWidth: true
-		}
-
-            CheckBox {
-                id: checkboxUseTransMem
+						Image {
+					   		source: modelData.icon
+					    		x: parent.height * 0.1
+					    		height: parent.height * 0.8
+					    		width: parent.height * 0.8
+						}
+						ProgressBar {
+					    		width: parent.width
+					    		to: 0.5
+					    		value: modelData.confidence
+					    		anchors.bottom: parent.bottom
+						}
+				    	}
+				}
+		    }
+	Item {
+        	Layout.fillWidth: true
+	}
+	CheckBox {
+		id: checkboxUseTransMem
                 width: 300
                 text: "Use TransMem"
                 scale: 0.5
                 font.bold: true
                 font.pointSize: 30
                 checked: true
-            }
-
-            CheckBox {
+        }
+	CheckBox {
                 id: checkboxShowProtagonist
                 x: 400
                 width: 50
@@ -69,16 +66,15 @@ ApplicationWindow {
                 font.bold: true
                 font.pointSize: 30
                 checked: true
-            }
-
-			ToolButton {
-				contentItem: Image {
-				anchors.centerIn: parent
-				source: "icons/ic_filter_center_focus_black_24px.svg"
-				}
-				onClicked: vision.calibrationRunning = true;
-			}
+        }
+	ToolButton {
+		contentItem: Image {
+			anchors.centerIn: parent
+			source: "icons/ic_filter_center_focus_black_24px.svg"
 		}
+	onClicked: vision.calibrationRunning = true;
+	}
+	}
     }
 
     Camera {
