@@ -74,8 +74,8 @@ ApplicationWindow {
 
 			ToolButton {
 				contentItem: Image {
-					anchors.centerIn: parent
-					source: "icons/ic_filter_center_focus_black_24px.svg"
+				anchors.centerIn: parent
+				source: "icons/ic_filter_center_focus_black_24px.svg"
 				}
 				onClicked: vision.calibrationRunning = true;
 			}
@@ -83,14 +83,14 @@ ApplicationWindow {
     }
 
     Camera {
-		id: camera
+	id: camera
 
         // For the logitec c920 webcam the following viewfinder resolutions work:
         //  "640x480" / "1280x720" / "1600X986" / "1920x1080" */
         viewfinder.resolution: "1280x720"
 
         captureMode: Camera.CaptureViewfinder
-		cameraState: Camera.LoadedState
+	cameraState: Camera.LoadedState
 
         // Uncomment the following statement to use a second camera on a laptop (not the internal one)
         //deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
@@ -99,11 +99,11 @@ ApplicationWindow {
     // On some devices there occurs a "CameraBin error: Internal data flow error." when using am usb camera.
     // Using this hack restarts the camera after the error occured and bypasses the problem.
     Timer {
-        running: true
-        interval: 3000
-        onTriggered: {
-            camera.stop();
-            camera.start();
+    	running: true
+	interval: 3000
+	onTriggered: {
+	camera.stop();
+	camera.start();
         }
     }
 
@@ -114,51 +114,51 @@ ApplicationWindow {
         onTriggered: markermodel.updateModel();
         repeat: true
     }
-
-	Vision {
-		id: vision
+    
+    Vision {
+	id: vision
         active: true
 
         landmarks: [
             Landmark {
-				id: worldCenterLandmark
-                identifier: "world"
-				fileName: ":/assets/markers/worldcenter.xml"
-				property string icon: "assets/markers/worldcenter_tracker.png"
+		id: worldCenterLandmark
+		identifier: "world"
+		fileName: ":/assets/markers/worldcenter.xml"
+		property string icon: "assets/markers/worldcenter_tracker.png"
             },
             Landmark {
-				id: orangeHouseLandmark
+		id: orangeHouseLandmark
                 identifier: "orangeHouse"
                 fileName: ":/assets/markers/orangehouse.xml"
-				property string icon: "assets/markers/orangehouse_tracker.png"
+		property string icon: "assets/markers/orangehouse_tracker.png"
             },
             Landmark {
-                id: adaHouseLandmark
-                identifier:  "adaHouse"
-                fileName: ":/assets/markers/adahouse.xml"
-                property string icon: "assets/markers/adahouse_tracker.png"
+	    	id: adaHouseLandmark
+		identifier:  "adaHouse"
+		fileName: ":/assets/markers/adahouse.xml"
+		property string icon: "assets/markers/adahouse_tracker.png"
             }
-		]
-	}
-
-	property rect cameraRect
-	VideoOutput {
-		id: videoOutput
-		anchors.fill: parent
+	]
+    }
+	
+    property rect cameraRect
+    VideoOutput {
+    	id: videoOutput
+	anchors.fill: parent
         //focus : visible
-		source: camera
+	source: camera
         filters: [vision]
-		fillMode: VideoOutput.PreserveAspectCrop
-		onContentRectChanged: cameraRect = mapNormalizedRectToItem(Qt.rect(0, 0, 1, 1));
-	}
+	fillMode: VideoOutput.PreserveAspectCrop
+	onContentRectChanged: cameraRect = mapNormalizedRectToItem(Qt.rect(0, 0, 1, 1));
+    }
 
-	Component.onCompleted: {
+    Component.onCompleted: {
         camera.start();
-	}
+    }
 
-	Component.onDestruction: {
-		camera.stop();
-	}
+    Component.onDestruction: {
+	camera.stop();
+    }
 
     MarkerModel {
         id: markermodel
@@ -170,8 +170,8 @@ ApplicationWindow {
         useTransMem: checkboxUseTransMem.checked
     }
 
-	Scene3d {
-		anchors.fill: parent
+    Scene3d {
+    	anchors.fill: parent
 
         camera: worldCenterLandmark.relativePose
         lens: vision.lens
@@ -181,13 +181,12 @@ ApplicationWindow {
                 id: orangeHouse
                 poseRelativeToWorldCenter: orangeHouseLandmark.relativePose
                 enabled: orangeHouseLandmark.visible
-            }
-
+	    }
            AdaHouse {
                id: adaHouse
                poseRelativeToWorldCenter: adaHouseLandmark.relativePose
                enabled: adaHouseLandmark.visible
-           }
+	    }
 
            // Very simplistic illustration of an "protagonist" walking through the scene.
            Protagonist {
@@ -196,44 +195,44 @@ ApplicationWindow {
         }
 
         WorldCenter {
-			id: worldCenter
+	    id: worldCenter
             enabled: worldCenterLandmark.visible
         }
     }
 
-	// calibration rectangle
-	Rectangle {
-		visible: vision.calibrationRunning
+    // calibration rectangle
+    Rectangle {
+	visible: vision.calibrationRunning
 
-		x: cameraRect.x  + (vision.calibrationRight ? cameraRect.width - cameraRect.height : 0)
-		y: cameraRect.y
-		height: cameraRect.height
-		width: cameraRect.height
-		opacity: 0.5
+	x: cameraRect.x  + (vision.calibrationRight ? cameraRect.width - cameraRect.height : 0)
+	y: cameraRect.y
+	height: cameraRect.height
+	width: cameraRect.height
+	opacity: 0.5
 
-		transform: [
+	transform: [
             Scale {
-				xScale: 1 / cameraRect.height
-				yScale: 1 / cameraRect.height
-			},
-			Matrix4x4 {
-				matrix: vision.calibrationTransform
-			},
-			Scale {
-				xScale: cameraRect.height
-				yScale: cameraRect.height
-			}
-		]
-	}
+		xScale: 1 / cameraRect.height
+		yScale: 1 / cameraRect.height
+	    },
+	    Matrix4x4 {
+		matrix: vision.calibrationTransform
+	    },
+	    Scale {
+		xScale: cameraRect.height
+		yScale: cameraRect.height
+	    }
+	]
+    }
 
-	// calibration progress bar
-	ProgressBar {
-		visible: vision.calibrationRunning
+    // calibration progress bar
+    ProgressBar {
+	visible: vision.calibrationRunning
 
-		width: parent.width / 3
-		anchors.bottom: parent.bottom
-		anchors.bottomMargin: parent.height / 3
-		anchors.horizontalCenter: parent.horizontalCenter
-		value: vision.calibrationProgress
-	}
+	width: parent.width / 3
+	anchors.bottom: parent.bottom
+	anchors.bottomMargin: parent.height / 3
+	anchors.horizontalCenter: parent.horizontalCenter
+	value: vision.calibrationProgress
+    }
 }
