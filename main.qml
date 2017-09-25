@@ -45,35 +45,35 @@ ApplicationWindow {
 				    	}
 				}
 		    }
-	Item {
-        	Layout.fillWidth: true
-	}
-	CheckBox {
-		id: checkboxUseTransMem
-                width: 300
-                text: "Use TransMem"
-                scale: 0.5
-                font.bold: true
-                font.pointSize: 30
-                checked: true
-        }
-	CheckBox {
-                id: checkboxShowProtagonist
-                x: 400
-                width: 50
-                text: "Show protagonist"
-                scale: 0.5
-                font.bold: true
-                font.pointSize: 30
-                checked: true
-        }
-	ToolButton {
-		contentItem: Image {
-			anchors.centerIn: parent
-			source: "icons/ic_filter_center_focus_black_24px.svg"
+		Item {
+        		Layout.fillWidth: true
 		}
-	onClicked: vision.calibrationRunning = true;
-	}
+		CheckBox {
+			id: checkboxUseTransMem
+			width: 300
+			text: "Use TransMem"
+			scale: 0.5
+			font.bold: true
+			font.pointSize: 30
+			checked: true
+		}
+		CheckBox {
+			id: checkboxShowProtagonist
+			x: 400
+			width: 50
+			text: "Show protagonist"
+			scale: 0.5
+			font.bold: true
+			font.pointSize: 30
+			checked: true
+		}
+		ToolButton {
+			contentItem: Image {
+				anchors.centerIn: parent
+				source: "icons/ic_filter_center_focus_black_24px.svg"
+			}
+		onClicked: vision.calibrationRunning = true;
+		}
 	}
     }
 
