@@ -1,6 +1,10 @@
 #include "markermodel.h"
 
-// Creates the transformation matrix from a rotation quaternion and a translation vector
+/*! \fn QMatrix4x4 rotAndTransPair2Matrix(const rotAndTransPair &qp)
+ * \brief Creates a 4x4 matrix from the rotAndTransPair \a qp (\see rotAndTransPair).
+ * \param qp RotAndTransPair describing a transformation through a quaternion and a vector.
+ * \return A 4x4 matrix representing the mapping equal to the transformation described by \a qp.
+ */
 QMatrix4x4 rotAndTransPair2Matrix(const rotAndTransPair &qp){
 
     QMatrix4x4 ret(qp.first.toRotationMatrix());
@@ -9,7 +13,12 @@ QMatrix4x4 rotAndTransPair2Matrix(const rotAndTransPair &qp){
 
 }
 
-// Separates the transformation encoded in a 4x4 matrix into a rotation quaternion and a translation vector
+/*! \fn rotAndTransPair matrix2rotAndTransPair(const QMatrix4x4 &m)
+ * \brief Separates the transformation encoded in the 4x4 matrix \a m into a rotation quaternion
+ * and a translation vector which are returned in a rotAndTransPair object (\see rotAndTransPair).
+ * \param m Encodes a transformation.
+ * \return A rotAndTransPair encoding the transformation described through \a m.
+ */
 rotAndTransPair matrix2rotAndTransPair(const QMatrix4x4 &m){
 
     float data[]{ m(0,0),m(0,1),m(0,2),
@@ -84,7 +93,10 @@ QVector4D compareRotAndTransPair(const rotAndTransPair &qp1, const rotAndTransPa
 
 }
 
-// Average two quaternions componentwise and normalized them afterwards
+/*! \fn QQuaternion avgAndNormalizeQuaternions(const QQuaternion &q1, const QQuaternion &q2)
+ * \brief Creates a new quaternion by averaging the two quaternions \a q1 and \a q2. The created
+ * quaternion is normalized before it is returned.
+ */
 QQuaternion avgAndNormalizeQuaternions(const QQuaternion &q1, const QQuaternion &q2){
 
     QQuaternion ret = QQuaternion( (q1.scalar() + q2.scalar()) / 2.,
@@ -95,7 +107,9 @@ QQuaternion avgAndNormalizeQuaternions(const QQuaternion &q1, const QQuaternion 
     return ret.normalized();
 }
 
-// Average two vectors
+/*! \fn QVector3D avgVector3D(const QVector3D &v1, const QVector3D &v2)
+ * \brief Creates a new vector by averaging the two vectors \a v1 and \a v2 component-wise.
+ */
 QVector3D avgVector3D(const QVector3D &v1, const QVector3D &v2){
 
     QVector3D ret = QVector3D((v1.x() + v2.x()) * 0.5,
@@ -105,11 +119,16 @@ QVector3D avgVector3D(const QVector3D &v1, const QVector3D &v2){
     return ret;
 }
 
-// Decides if two transformations are "equal" or not
-bool equalTransformation(const rotAndTransPair &qp1, const rotAndTransPair &qp2){
-
-    // Parameter to decide if to transforamtion are equal.              ratioLenT   distanceNormalT  distanceNormalPointR  distanceNormalR
-    const QVector4D thTransformationEquality = QVector4D(        0.2,        0.2,             0.2,                  0.2);
+/*! \fn bool equalTransformation(const rotAndTransPair &qp1, const rotAndTransPair &qp2,
+ *                               const QVector4D &thTransformationEquality)
+ * \brief Determines whether the two transformations encoded in \a qp1 and \a qp2 are equal. The two transformations
+ * are considered to be equal if the difference vector calculated with compareRotAndTransPair(..) is component-wise
+ * smaller than the threshold \a thTransformationEquality.
+ */
+bool equalTransformation(const rotAndTransPair &qp1, const rotAndTransPair &qp2,
+                         const QVector4D &thTransformationEquality = QVector4D(0.2, 0.2, 0.2, 0.2)){
+    // thTransformationEquality:
+    // Parameter to decide if to transforamtion are equal. ratioLenT, distanceNormalT, distanceNormalPointR, distanceNormalR
 
     QVector4D diff = compareRotAndTransPair(qp1, qp2);
 
@@ -575,7 +594,7 @@ void MarkerModelMonitor::writeAllLinkUpateRecordsToFile(const QString &path){
     }
 }
 
-void MarkerModelMonitor::writeSingleLinkUpdateRecordToFile(std::list<LinkUpdate> &output, const QString &path, bool appenSRCandDST){
+void MarkerModelMonitor::writeSingleLinkUpdateRecordToFile(std::list<LinkUpdate> &output, const QString &path, bool appendSRCandDST){
 
     const QString lineSeperator = ",", newLine = "\n";
 
@@ -599,7 +618,7 @@ void MarkerModelMonitor::writeSingleLinkUpdateRecordToFile(std::list<LinkUpdate>
             << QString::number(lu.transformation.second.z())        << lineSeperator
             << QString::number(lu.confidence);
 
-        if(appenSRCandDST){
+        if(appendSRCandDST){
             out << lineSeperator
                 << lu.srcFrame                                          << lineSeperator
                 << lu.dstFrame;

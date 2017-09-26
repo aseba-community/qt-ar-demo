@@ -96,6 +96,7 @@ ApplicationWindow {
         //deviceId: QtMultimedia.availableCameras[1].deviceId // hack to use second camera on laptop
 	}
 
+    /*
     // On some devices there occurs a "CameraBin error: Internal data flow error." when using am usb camera.
     // Using this hack restarts the camera after the error occured and bypasses the problem.
     Timer {
@@ -106,6 +107,7 @@ ApplicationWindow {
             camera.start();
         }
     }
+    */
 
     // Timer to update the marker model.
     Timer {
