@@ -1,6 +1,6 @@
 # Thymio-AR-Demo
 
-This is a small demo illustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure). The demo is part of a bachelor thesis where the report found [here](https://github.com/fluckmic/TransMem/blob/2e386f95eb4cb203e0984b96ede7579a88aa28d2/documents/report.pdf). The intend behind this demo is easiest explained by going through [these](https://github.com/fluckmic/TransMem/blob/2e386f95eb4cb203e0984b96ede7579a88aa28d2/documents/presentation/presentation.pdf) slides.
+This is a small demo illustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure). The demo is part of a bachelor thesis where the report can be found [here](https://github.com/fluckmic/TransMem/blob/2e386f95eb4cb203e0984b96ede7579a88aa28d2/documents/report.pdf). The intend behind this demo is easiest understood by going through [these](https://github.com/fluckmic/TransMem/blob/2e386f95eb4cb203e0984b96ede7579a88aa28d2/documents/presentation/presentation.pdf) slides.
 
 ## Authors and license
 
