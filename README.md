@@ -1,5 +1,5 @@
-# thymio-ar-demo
-A small demo with Qt + AR + Thymio
+# Thymio-AR-Demo
+A small demo with Qt + AR + Thymio. 
 
 ![banner](banner.jpg)
 
@@ -26,7 +26,8 @@ AR in free play still works if no Thymio is connected, but you won't be able to 
 
 This repository makes heavy use of [git submodule](https://git-scm.com/docs/git-submodule) to include its dependencies:
 ```
-. – this tutorial
+. – this demo
+├── transmem - library improving the vision systemt
 ├── assets – visual assets for this game
 └── thymio-ar – augmented reality support for Thymio on mobile
 	├── thymio-tracker – tracking library using OpenCV
@@ -36,7 +37,6 @@ This repository makes heavy use of [git submodule](https://git-scm.com/docs/git-
 ```
 
 When you clone this repository with a modern git, the submodules will be fetched.
-If you want to update them, we provide the script `submodule-update.sh`.
 
 ## Linux and Android Compilation
 
@@ -68,15 +68,22 @@ Unzip and compile it; in a terminal in the OpenCV directory:
 mkdir -p build && cd build && cmake .. && make
 ```
 
-You now have a development environment ready to compile Thymio Programming Adventure on Ubuntu.
+You now have a development environment ready to compile the Thymio-AR-Demo on Ubuntu.
 
 ### Download
 
 Download it with git and update submodules:
 ```sh
-git clone --recursive https://github.com/aseba-community/thymio-adventure.git
-cd thymio-adventure
-./submodule-update.sh
+git clone https://github.com/fluckmic/thymio-ar-demo.git
+cd thymio-ar-demo
+git submodule init
+git submodule update
+cd thymio-ar
+git submodule init
+git submodule update
+cd thymio-vpl2
+git submodule init
+git submodule update
 ```
 
 ### Compile
