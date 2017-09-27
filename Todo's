@@ -1,7 +1,0 @@
-TODO's:
-	
-*Figuring out what the problem behind the "CameraBin error: Internal data flow error." is. This error occurs when using an external webcam plugged in via usb.
-
-*Proper solution to choose from all available camera on the device.
-
-*Make the adahouse model available. 
