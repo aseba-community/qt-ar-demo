@@ -1,10 +1,6 @@
 # Thymio-AR-Demo
-A small demo with Qt + AR + Thymio. 
 
-![banner](banner.jpg)
-
-An interactive tutoring to learning programming using the [Thymio robot](http://thymio.org) and Augmented Reality.
-A booklet describing the project is available [here](http://www.mobsya.org/ext-media/Thymio_adventure%20-%20small.pdf).
+This is a small demo ilustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure).
 
 ## Authors and license
 
@@ -13,14 +9,6 @@ Please see the files [AUTHORS.md](AUTHORS.md) and [LICENSE.md](LICENSE.md).
 ## How to use AR
 
 To see an AR world, you have to print the marker in `images/marker-312.png` at size 11 cm x 11 cm.
-If you do not have an AR Thymio, you have to print a fake Thymio top in `images/thymioAR_pattern_synt.png` at size 11 cm x 11 cm.
-Then you can compile and launch `thymio-adventure`.
-If you have a Thymio, please plug it in.
-If you launch the app the first time, you will be presented with the first mission, whose goal is to calibrate the camera.
-Present the fake Thymio top until the app tells you a robot is detected, then follow the mission.
-Once the calibration is done, you can select another mission to play with AR by going into the _map_ menu.
-Note that you can also access AR in the free play mode, by clicking in the top-right eye icon.
-AR in free play still works if no Thymio is connected, but you won't be able to do the missions.
 
 ## Understanding the source tree
 
