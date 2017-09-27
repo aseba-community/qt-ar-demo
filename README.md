@@ -1,6 +1,6 @@
 # Thymio-AR-Demo
 
-This is a small demo ilustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure).
+This is a small demo illustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure). The demo is part of a bachelo thesis where the report found [here](). The intend behind this demo is easiest explained by going through [these]() slides.
 
 ## Authors and license
 
@@ -8,7 +8,7 @@ Please see the files [AUTHORS.md](AUTHORS.md) and [LICENSE.md](LICENSE.md).
 
 ## How to use AR
 
-To see an AR world, you have to print the marker in `images/marker-312.png` at size 11 cm x 11 cm.
+To see an AR world, you have to print the markers in `images/` at size 11 cm x 11 cm.
 
 ## Understanding the source tree
 
