@@ -1,6 +1,6 @@
 # Thymio-AR-Demo
 
-This is a small demo illustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure). The demo is part of a bachelo thesis where the report found [here](). The intend behind this demo is easiest explained by going through [these]() slides.
+This is a small demo illustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure). The demo is part of a bachelor thesis where the report found [here](). The intend behind this demo is easiest explained by going through [these]() slides.
 
 ## Authors and license
 
