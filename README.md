@@ -36,8 +36,6 @@ This repository makes heavy use of [git submodule](https://git-scm.com/docs/git-
 		└── dashel – the Dashel communication framework
 ```
 
-When you clone this repository with a modern git, the submodules will be fetched.
-
 ## Linux and Android Compilation
 
 This guide assumes a basic knowledge of Linux development tools.
