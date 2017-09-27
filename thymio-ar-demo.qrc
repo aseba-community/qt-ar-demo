@@ -8,6 +8,13 @@
         <file>OrangeHouse.qml</file>
         <file>assets/markers/orangehouse_tracker.png</file>
         <file>assets/markers/orangehouse.xml</file>
+        <file>assets/markers/adahouse.xml</file>
+        <file>assets/markers/adahouse_tracker.png</file>
+        <file>AdaHouse.qml</file>
+        <file>assets/markers/bluehouse.xml</file>
+        <file>assets/markers/bluehouse_tracker.png</file>
+        <file>BlueHouse.qml</file>
+        <file>Protagonist.qml</file>
         <file>icons/ic_filter_center_focus_black_24px.svg</file>
     </qresource>
 </RCC>

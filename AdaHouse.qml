@@ -15,11 +15,12 @@ Entity {
     Entity {
         components: [
             SceneLoader {
-                source: "/models/orangehouse.qgltf"
+                // The adahousemodel is not available yet, therefore the model for the bluehouse is used instead.
+                source: "/models/bluehouse.qgltf"
             },
-            // Transforms the 3D model to align it with the drawing on the marker.
+            // Transform the model to align it with the drawing on the marker.
             Transform {
-                rotation: fromAxisAndAngle(Qt.vector3d(0,0,1), 180)
+                scale3D: Qt.vector3d(0.45, 0.45, 0.45)
                 translation: Qt.vector3d(0, 0, -0.038)
             }
         ]
