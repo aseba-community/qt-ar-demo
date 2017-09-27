@@ -88,7 +88,7 @@ git submodule update
 
 ### Compile
 
-Launch Qt Creator and open `thymio-adventure.pro`.
+Launch Qt Creator and open `thymio-ar-demo.pro`.
 
 Go to the _Projects_ tab, click _Configure Project_.
 
@@ -112,7 +112,7 @@ Then, install the Android environment as [explained in the Qt5 documentation](ht
 
 Then, go to the [OpenCV download page](http://opencv.org/downloads.html), and download the Android archive for version 3.X.
 
-Launch Qt Creator and open `thymio-adventure.pro`.
+Launch Qt Creator and open `thymio-ar-demo.pro`.
 
 Go to the _Projects_ tab, go to _Android [...]_, select _Build_.
 In _Build Steps_, click _Details_ on the _qmake_ pane.
