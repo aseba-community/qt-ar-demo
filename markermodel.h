@@ -166,6 +166,14 @@ private:
      */
     StampedTransformationWithConfidence multiplySTWC( const StampedTransformationWithConfidence &lhs, const StampedTransformationWithConfidence &rhs);
 
+    /*! \fn StampedTransformationWithConfidence averageSTWCifEqual(StampedTransformationWithConfidence &lhs, StampedTransformationWithConfidence &rhs)
+     * \brief Compares the transformations encoded through \a lhs and \a rhs. The comparison is done with
+     * QVector4D compareRotAndTransPair(). The two StampedTransformationWithConfidence objects are averaged
+     * if this is the case. The averaging is done component-wise (\see QQuaternion avgAndNormalizeQuaternions(..)
+     * and QVector3D avgVector3D(..)). The time and maxDistanceToEntry for the result is chosen from \a lhs.
+     * The confidence of the result is set to the average of the confidence value of \a lhs and \a rhs.
+     * If the two transformations are not equal then the \a lhs is returned as a result.
+     */
     StampedTransformationWithConfidence averageSTWCifEqual(StampedTransformationWithConfidence &lhs, StampedTransformationWithConfidence &rhs);
 
     /*! \fn  StampedTransformationWithConfidence invertSTCW(StampedTransformationWithConfidence &lhs)

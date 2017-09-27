@@ -31,8 +31,18 @@ rotAndTransPair matrix2rotAndTransPair(const QMatrix4x4 &m){
     return rotAndTransPair{QQuaternion::fromRotationMatrix(rM), QVector3D(m(0,3), m(1,3), m(2,3))};
 }
 
-// Compares two transformations, each encoded through a rotation translation pair
-// See function body for further information
+/*! \QVector4D compareRotAndTransPair(const rotAndTransPair &qp1, const rotAndTransPair &qp2)
+ * \brief Compares the two transformations encoded through \a qp1 and \a qp2. As a result of the
+ * comparison a vector is returned. Each component of this vector describes the result of one of four comparisons:
+ * - x component: Ratio between the length of the two translation vectors mapped to [0,2]
+ * - y component: Distance between the two normalized translation vectors.
+ * - z component: Distance between a point perpendicular to the rotation axis with
+ *                length one and this point rotated by the angle difference
+ * - w component: Distance between the two normalized rotation vectors.
+ * For the comparison each of the two transformations is internally splitted up into its normalized rotation axis, the
+ * corresponding angle and into the normalized translation vector with a corrensponding scalar magnitude.
+ * \return The 4D vector encoding the difference of two transformations in its four components x,y,z and w.
+ */
 QVector4D compareRotAndTransPair(const rotAndTransPair &qp1, const rotAndTransPair &qp2){
 
     const double toRad = M_PI/180;
