@@ -6,4 +6,4 @@
 	url = https://github.com/aseba-community/thymio-ar.git
 [submodule "transmem"]
 	path = transmem
-	url = https://github.com/fluckmic/transmem
+	url = https://github.com/aseba-community/transmem
