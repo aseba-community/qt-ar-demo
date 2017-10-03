@@ -3,7 +3,7 @@
 	url = https://github.com/aseba-community/thymio-adventure-assets.git
 [submodule "thymio-ar"]
 	path = thymio-ar
-	url = https://github.com/fluckmic/thymio-ar.git
+	url = https://github.com/aseba-community/thymio-ar.git
 [submodule "transmem"]
 	path = transmem
 	url = https://github.com/fluckmic/transmem
