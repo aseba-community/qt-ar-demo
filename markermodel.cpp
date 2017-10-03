@@ -573,7 +573,6 @@ void MarkerModelMonitor::writeAllTransformationUpateRecordsToFile(const QString 
 
         for(TransformationUpdate& tu : recordToWrite){
             tu.timeSinceFirstRecordedUpdate = ((std::chrono::duration_cast<std::chrono::milliseconds>(tu.time - monitoringStartedAt)).count());
-            tu.transformationID;
         }
 
         writeSingleTransforamtionUpdateRecordToFile(recordToWrite, path + "Transformation_Update_Record_" + transID);
