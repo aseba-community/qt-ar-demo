@@ -1,4 +1,4 @@
-# Thymio-AR-Demo
+# Qt AR Demo
 
 This is a small demo illustrating the vision system part of the [Thymio programming adventure](https://github.com/aseba-community/thymio-adventure). The demo is part of a bachelor thesis where the report can be found [here](https://github.com/fluckmic/TransMem/blob/2e386f95eb4cb203e0984b96ede7579a88aa28d2/documents/report.pdf). The intend behind this demo is easiest understood by going through [these](https://github.com/fluckmic/TransMem/blob/2e386f95eb4cb203e0984b96ede7579a88aa28d2/documents/presentation/presentation.pdf) slides.
 
@@ -19,9 +19,9 @@ The following images are used in this demo:
 This repository makes heavy use of [git submodule](https://git-scm.com/docs/git-submodule) to include its dependencies:
 ```
 . – this demo
-├── transmem - library improving the vision systemt
-├── assets – visual assets for this game
-└── thymio-ar – augmented reality support for Thymio on mobile
+├── transmem - spatio-temporal frame library
+├── assets – visual assets for this demo
+└── thymio-ar – Qt integration of the tracking library
 	└── thymio-tracker – tracking library using OpenCV
 ```
 
