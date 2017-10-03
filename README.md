@@ -18,7 +18,7 @@ This repository makes heavy use of [git submodule](https://git-scm.com/docs/git-
 ├── transmem - library improving the vision systemt
 ├── assets – visual assets for this game
 └── thymio-ar – augmented reality support for Thymio on mobile
-	├── thymio-tracker – tracking library using OpenCV
+	└── thymio-tracker – tracking library using OpenCV
 ```
 
 ## Linux and Android Compilation

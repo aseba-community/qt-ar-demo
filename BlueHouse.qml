@@ -8,7 +8,7 @@ Entity {
 
     components: [
         Transform {
-            matrix: t.inverted()
+            matrix: poseRelativeToWorldCenter.inverted()
         }
     ]
 

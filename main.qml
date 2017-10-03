@@ -150,7 +150,6 @@ ApplicationWindow {
     VideoOutput {
         id: videoOutput
         anchors.fill: parent
-        //focus : visible
         source: camera
         filters: [vision]
         fillMode: VideoOutput.PreserveAspectCrop
