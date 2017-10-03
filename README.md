@@ -4,7 +4,7 @@ This is a small demo illustrating the vision system part of the [Thymio programm
 
 ## Authors and license
 
-Please see the files [AUTHORS.md](AUTHORS.md) and [LICENSE.md](LICENSE.md).
+Please see the files [AUTHORS.md](AUTHORS.md) and [LICENSE.txt](LICENSE.txt).
 
 ## How to use AR
 
@@ -19,9 +19,6 @@ This repository makes heavy use of [git submodule](https://git-scm.com/docs/git-
 ├── assets – visual assets for this game
 └── thymio-ar – augmented reality support for Thymio on mobile
 	├── thymio-tracker – tracking library using OpenCV
-	└── thymio-vpl2 – Visual Programming Language for Thymio on mobile
-		├── aseba – the Aseba framework
-		└── dashel – the Dashel communication framework
 ```
 
 ## Linux and Android Compilation
@@ -40,7 +37,7 @@ sudo apt-get install build-essential cmake-gui mesa-common-dev libglu1-mesa-dev 
 ```
 
 Then, install Qt 5 and Qt creator.
-Go on the [QT5 open source download page](https://www.qt.io/download-open-source/), and download the installer.
+Go on the [Qt5 open source download page](https://www.qt.io/download-open-source/), and download the installer.
 Run it in a terminal (the exact name of the file might change slightly):
 ```sh
 chmod +x qt-unified-linux-x64-online.run
@@ -60,17 +57,13 @@ You now have a development environment ready to compile the Thymio-AR-Demo on Ub
 
 Download it with git and update submodules:
 ```sh
-git clone https://github.com/fluckmic/thymio-ar-demo.git
-cd thymio-ar-demo
-git submodule init
-git submodule update
-cd thymio-ar
-git submodule init
-git submodule update
-cd thymio-vpl2
-git submodule init
-git submodule update
+git clone --recursive https://github.com/fluckmic/thymio-ar-demo.git
 ```
+
+### Work-around missing qgltf for Android
+
+When compiling for Android, the `qgltf` binary is not provided in `android_armv7/bin`.
+To work around this problem, in that directory, simply link the `gcc_64` version: `ln -s ../../gcc_64/bin/qgltf`.
 
 ### Compile
 

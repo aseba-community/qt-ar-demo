@@ -1,6 +1,6 @@
-[submodule "thymio-adventure-assets"]
+[submodule "thymio-adventure-assets-qt3d"]
 	path = assets
-	url = https://github.com/aseba-community/thymio-adventure-assets.git
+	url = https://github.com/aseba-community/thymio-adventure-assets-qt3d.git
 [submodule "thymio-ar"]
 	path = thymio-ar
 	url = https://github.com/aseba-community/thymio-ar.git
