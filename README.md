@@ -8,7 +8,11 @@ Please see the files [AUTHORS.md](AUTHORS.md) and [LICENSE.txt](LICENSE.txt).
 
 ## How to use AR
 
-To see an AR world, you have to print the markers in `images/` at size 11 cm x 11 cm.
+To see an AR world, you have to print markers, that you can find at https://github.com/aseba-community/thymio-adventure-assets/tree/master/markers.
+The following images are used in this demo:
+- [adahouse_3D.pdf](https://github.com/aseba-community/thymio-adventure-assets/raw/master/markers/adahouse_3D.pdf)
+- [orangehouse_3D.pdf](https://github.com/aseba-community/thymio-adventure-assets/raw/master/markers/orangehouse_3D.pdf)
+- [worldcenter_orig.png](https://github.com/aseba-community/thymio-adventure-assets/raw/master/markers/worldcenter_orig.png), at a size of 11 cm x 11 cm.
 
 ## Understanding the source tree
 
