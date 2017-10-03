@@ -1,7 +1,6 @@
 <RCC>
     <qresource prefix="/">
         <file>main.qml</file>
-        <file>assets/marker.xml</file>
         <file>assets/markers/worldcenter.xml</file>
         <file>assets/markers/worldcenter_tracker.png</file>
         <file>WorldCenter.qml</file>
