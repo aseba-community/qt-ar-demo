@@ -116,6 +116,14 @@ ApplicationWindow {
 	id: vision
         active: true
 
+		// for NVidia Shield K1
+		gyroscopeToCameraTransform: Qt.matrix4x4(
+			 0,  1,  0,  0,
+			-1,  0,  0,  0,
+			 0,  0, -1,  0,
+			 0,  0,  0,  1
+		)
+
         landmarks: [
             Landmark {
 		id: worldCenterLandmark
