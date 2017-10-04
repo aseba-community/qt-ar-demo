@@ -1,5 +1,5 @@
 TEMPLATE = app
-QT += core quick widgets
+QT += core quick svg xml
 SOURCES += \
     main.cpp \
     transmem/src/transmem.cpp \
